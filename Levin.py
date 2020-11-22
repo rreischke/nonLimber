@@ -11,7 +11,9 @@ min_interval = 1.0e-2
 tol_rel = 1.0e-6      # desired relative accuracy
 epsilon = 1.0e-12  # limit for the absolute error (due to machine accuracy)
 tol_abs = epsilon
-N_interp = 150  # Number of interpolation points used for the k integration
+N_interp = 300  # Number of interpolation points used for the k integration
+k_max_frac_gc = [100, 5, 3.0]
+k_min_frac_gc = [0.1, 0.1, 0.5]
 
 num_cores = multiprocessing.cpu_count()
 data_background = np.load("background.npz")
@@ -20,7 +22,6 @@ redshift = data_background['z']
 comoving_distance = data_background['chi']
 chi_of_z = interp1d(redshift, comoving_distance)
 z_of_chi = interp1d(comoving_distance, redshift)
-
 
 data_kernels = np.load("kernels.npz")
 lst = data_kernels.files
@@ -36,6 +37,8 @@ for i in range(n_number_counts+n_cosmic_shear):
     if(i < n_number_counts):
         kernel.append(
             interp1d(comoving_distance_cl, kernels_cl[i, :], kind='cubic'))
+        for k in range(len(comoving_distance_cl)):
+            print(comoving_distance_cl[k], kernels_cl[i, k])
         kernel_maximum[i] = comoving_distance_cl[np.where(
             kernels_cl[i, :] == max(kernels_cl[i, :]))]
     else:
@@ -359,10 +362,19 @@ def Limber(ell, i_tomo, j_tomo, linear=False):
 
 
 def C_ell_full_expression(ell, i_tomo, j_tomo, linear=False):
-    kmin_i_tomo = max(0.1*(ell+0.5)/kernel_maximum[i_tomo], k_min)
-    kmax_i_tomo = min(10.0*(ell+0.5)/kernel_maximum[i_tomo], k_max)
-    kmin_j_tomo = max(0.1*(ell+0.5)/kernel_maximum[j_tomo], k_min)
-    kmax_j_tomo = min(10.0*(ell+0.5)/kernel_maximum[j_tomo], k_max)
+    index_k = 0
+    if(ell > 10):
+        index_k = 1
+    if(ell > 30):
+        index_k = 2
+    kmin_i_tomo = max(k_min_frac_gc[index_k] *
+                      (ell+0.5)/kernel_maximum[i_tomo], k_min)
+    kmax_i_tomo = min(k_max_frac_gc[index_k] *
+                      (ell+0.5)/kernel_maximum[i_tomo], k_max)
+    kmin_j_tomo = max(k_min_frac_gc[index_k] *
+                      (ell+0.5)/kernel_maximum[j_tomo], k_min)
+    kmax_j_tomo = min(k_max_frac_gc[index_k] *
+                      (ell+0.5)/kernel_maximum[j_tomo], k_max)
     if(i_tomo >= n_number_counts):
         kmax_i_tomo = 1.0
     if(j_tomo >= n_number_counts):
@@ -402,13 +414,13 @@ def C_ell_full_expression(ell, i_tomo, j_tomo, linear=False):
                 return 0.0
             else:
                 return aux_interp_j(x)
-        result = 2.0/np.pi * integrate.quad(lambda x: aux_weight_i_tomo(np.log(x))
+        result = 2.0/np.pi * integrate.quadrature(lambda x: aux_weight_i_tomo(np.log(x))
                                             * aux_weight_j_tomo(np.log(x)), np.exp(min(k_interp_i_tomo[0], k_interp_j_tomo[0])), np.exp(max(k_interp_i_tomo[-1], k_interp_j_tomo[-1])))[0]
         return result
 
 
 def all_C_ell_limber(ell_list, linear=False):
-    ntotal = 3  # n_cosmic_shear + n_number_counts
+    ntotal = n_cosmic_shear + n_number_counts
     result = np.zeros((len(ell_list), ntotal, ntotal))
     for i in range(len(ell_list)):
         ell = int(ell_list[i])
@@ -422,7 +434,7 @@ def all_C_ell_limber(ell_list, linear=False):
 def all_C_ell_full(ell_list, linear=False):
     Limber_tolerance = 1e-3
     min_ell_check_Limber = 50
-    ntotal = 3  # n_cosmic_shear + n_number_counts
+    ntotal = n_cosmic_shear + n_number_counts
     result = np.zeros((len(ell_list), ntotal, ntotal))
     use_limber = np.zeros(ntotal)
     for i in range(len(ell_list)):
@@ -460,12 +472,15 @@ def all_C_ell_full(ell_list, linear=False):
             j_tomo = a - i_tomo*ntotal
             aux_result = 0.0
             if(i_tomo <= j_tomo):
-                if(use_limber[i_tomo] == 0):
-                    aux_result = 2.0/np.pi * integrate.quad(lambda x: aux_weight(np.log(x), i_tomo)
-                                                            * aux_weight(np.log(x), j_tomo), np.exp(min(aux_kmin[i_tomo], aux_kmin[j_tomo])), np.exp(max(aux_kmax[i_tomo], aux_kmax[j_tomo])))[0]
+                if(i_tomo - j_tomo > 2 and j_tomo < n_number_counts and i_tomo < n_number_counts):
+                    aux_result = 0.0
                 else:
-                    aux_result = Limber(
-                        ell, i_tomo, j_tomo, linear)
+                    if(use_limber[i_tomo] == 0):
+                        aux_result = 2.0/np.pi * integrate.quad(lambda x: aux_weight(np.log(x), i_tomo)
+                                                                * aux_weight(np.log(x), j_tomo), np.exp(min(aux_kmin[i_tomo], aux_kmin[j_tomo])), np.exp(max(aux_kmax[i_tomo], aux_kmax[j_tomo])))[0]
+                    else:
+                        aux_result = Limber(
+                            ell, i_tomo, j_tomo, linear)
             return aux_result
 
         def integral_limber(ell, a):
@@ -473,8 +488,11 @@ def all_C_ell_full(ell_list, linear=False):
             j_tomo = a - i_tomo*ntotal
             aux_result = 0.0
             if(i_tomo <= j_tomo):
-                aux_result = Limber(
-                    ell, i_tomo, j_tomo, linear)
+                if(i_tomo - j_tomo > 2 and j_tomo < n_number_counts and i_tomo < n_number_counts):
+                    aux_result = 0.0
+                else:
+                    aux_result = Limber(
+                        ell, i_tomo, j_tomo, linear)
             return aux_result
 
         aux_full = np.zeros(ntotal*ntotal)
@@ -498,17 +516,15 @@ def all_C_ell_full(ell_list, linear=False):
     return result
 
 
-N = 30
-# x=np.exp(np.linspace(np.log(1e-4), np.log(1e-2), N))
-x = np.linspace(2, 90, N)
-# y = []
-# y1 = []
-ntotal = 3  # n_cosmic_shear + n_number_counts
-spectra = all_C_ell_full(x, True)
-spectra_limber = all_C_ell_limber(x, True)
-
-# Plotting
-
+N = 10
+x = np.linspace(2, 20, N)
+ntotal = 5  # n_cosmic_shear + n_number_counts
+plotting = False
+y = np.zeros(N)
+ylimber = np.zeros(N)
+for i in range(N):
+    y[i] = C_ell_full_expression(x[i], 8, 10, True)
+    ylimber[i] = Limber(x[i], 8, 10, True)
 fontsi = 8
 fontsi2 = 8
 plt.tick_params(labelsize=fontsi)
@@ -516,59 +532,73 @@ plt.rc('text', usetex=True)
 plt.rc('font', family='sans-serif')
 plt.rcParams['xtick.labelsize'] = '8'
 plt.rcParams['ytick.labelsize'] = '8'
-fig, ax = plt.subplots(ntotal, ntotal)
-max_yticks = 2
-max_xticks = 2
-# yloc = plt.MaxNLocator(max_yticks)
-# xloc = plt.MaxNLocator(max_yticks)
-for i in range(ntotal):
-    for j in range(i):
-        ax[i, j].axis('off')
-
-# for i in range(ntotal-1):
-#    a = i + 1
-#    for j in range(a, ntotal):
-#        ax[i, j].set_xticklabels([])
-
-
-for i in range(ntotal):
-    for j in range(i, ntotal):
-        ax[i, j].set_yscale('log')
-        ax[i, j].set_xscale('log')
-        y = np.zeros(N)
-        y1 = np.zeros(N)
-        for a in range(N):
-            y[a] = x[a]*(x[a]+1)*spectra[a][i][j]
-            y1[a] = x[a]*(x[a]+1)*spectra_limber[a][i][j]
-        ax[i, j].plot(x, y, ls="-", color="blue", lw=1)
-        ax[i, j].plot(x, y1, ls="-", color="red", lw=1)
-
-        # ax[i, j].plot(x, y1 , label =r"\mathrm{Limber}", ls="-", color="blue")
-        # ax[i, j].set_xscale('log')
-
-
-for i in range(ntotal):
-    for j in range(ntotal):
-        if(i != j):
-            ax[i, j].set_xticklabels([])
-#            ax[i, j].set_yticklabels([])
-        else:
-            ax[i, j].set_xlabel(r"$\ell$", fontsize=fontsi)
-            ax[i, j].set_ylabel(
-                r"$\ell(\ell+1) C_\ell$", fontsize=fontsi)
-
-plt.subplots_adjust(wspace=0.0)
-plt.subplots_adjust(hspace=0.0)
-# leg = ax[0, 0].legend(fancybox=True, loc='upper right',
-# fontsize=fontsi, frameon=False)
-
-
+plt.plot(x, y, color="red")
+plt.plot(x, ylimber, color="blue")
 plt.tight_layout()
-
 plt.savefig('Spectra_full.pdf')
 
-# plt.plot(x, y1, ls="--")
+if(plotting):
+    spectra = all_C_ell_full(x, True)
+    spectra_limber = all_C_ell_limber(x, True)
+    fontsi = 8
+    fontsi2 = 8
+    plt.tick_params(labelsize=fontsi)
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='sans-serif')
+    plt.rcParams['xtick.labelsize'] = '8'
+    plt.rcParams['ytick.labelsize'] = '8'
+    fig, ax = plt.subplots(ntotal, ntotal)
+    max_yticks = 2
+    max_xticks = 2
+    # yloc = plt.MaxNLocator(max_yticks)
+    # xloc = plt.MaxNLocator(max_yticks)
+    for i in range(ntotal):
+        for j in range(i):
+            ax[i, j].axis('off')
 
-# plt.yscale('log')
-# plt.xscale('log')
-# plt.show()
+    # for i in range(ntotal-1):
+    #    a = i + 1
+    #    for j in range(a, ntotal):
+    #        ax[i, j].set_xticklabels([])
+
+    for i in range(ntotal):
+        for j in range(i, ntotal):
+            ax[i, j].set_yscale('log')
+            ax[i, j].set_xscale('log')
+            y = np.zeros(N)
+            y1 = np.zeros(N)
+            for a in range(N):
+                y[a] = x[a]*(x[a]+1)*spectra[a][i +
+                                                n_number_counts][j+n_number_counts]
+                y1[a] = x[a]*(x[a]+1)*spectra_limber[a][i +
+                                                        n_number_counts][j+n_number_counts]
+            ax[i, j].plot(x, y, ls="-", color="blue", lw=1)
+            ax[i, j].plot(x, y1, ls="-", color="red", lw=1)
+
+            # ax[i, j].plot(x, y1 , label =r"\mathrm{Limber}", ls="-", color="blue")
+            # ax[i, j].set_xscale('log')
+
+    for i in range(ntotal):
+        for j in range(ntotal):
+            if(i != j):
+                ax[i, j].set_xticklabels([])
+    #            ax[i, j].set_yticklabels([])
+            else:
+                ax[i, j].set_xlabel(r"$\ell$", fontsize=fontsi)
+                ax[i, j].set_ylabel(
+                    r"$\ell(\ell+1) C_\ell$", fontsize=fontsi)
+
+    plt.subplots_adjust(wspace=0.0)
+    plt.subplots_adjust(hspace=0.0)
+    # leg = ax[0, 0].legend(fancybox=True, loc='upper right',
+    # fontsize=fontsi, frameon=False)
+
+    plt.tight_layout()
+
+    plt.savefig('Spectra_full.pdf')
+
+    # plt.plot(x, y1, ls="--")
+
+    # plt.yscale('log')
+    # plt.xscale('log')
+    # plt.show()
