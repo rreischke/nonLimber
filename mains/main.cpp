@@ -6,6 +6,9 @@ using namespace std::chrono;
 
 int main()
 {
+    /**
+     * Sets up the input for the integration class.
+     */
     std::vector<double> z_bg;
     std::vector<double> chi_bg;
     std::vector<double> chi_cl;
@@ -74,23 +77,20 @@ int main()
         }
     }
     in_pk.close();
+// Input definitions done
+
+// Constructing the input of the class
     Levin_power lp(10, z_bg, chi_bg, chi_cl, kernel, k_pk, z_pk, pk_l, pk_nl);
+
+ // Define output file    
     std::fstream test;
     test.open("test.txt", std::ios::out);
-    uint N = 40;
-    double zmin = 0.1;
-    double zmax = 2.0;
-    double kmin = 1e-3;
-    double kmax = 1.0;
-    std::vector<double> z(N, 0.0);
-    std::vector<double> k1(N, 0.0);
+    uint N = 50;
     std::vector<uint> ell(N, 0.0);
     for (uint i = 0; i < N; i++)
     {
         ell.at(i) = 2 + i;
     }
-    z = lp.linear_spaced(zmin, zmax, N);
-    k1 = lp.linear_spaced(kmin, kmax, N);
     std::vector<double> result(ell.size() * Ntomo * Ntomo, 0.0);
     auto start = high_resolution_clock::now();
     result = lp.all_C_ell(ell, true);

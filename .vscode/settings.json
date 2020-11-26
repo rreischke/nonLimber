@@ -51,6 +51,7 @@
         "ctime": "cpp",
         "cinttypes": "cpp",
         "chrono": "cpp",
-        "ratio": "cpp"
+        "ratio": "cpp",
+        "thread": "cpp"
     }
 }
