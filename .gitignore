@@ -1,3 +1,5 @@
 latex/
 html/
 doxyfile
+doxyfile.log
+.vscode
