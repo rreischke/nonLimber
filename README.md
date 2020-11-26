@@ -1,5 +1,7 @@
-# Calculating the non-Limber expression for the angular power spectrum using the Levin integration
-The integral which we are trying to solve numerically is the following 
-<img src="https://render.githubusercontent.com/render/math?math= I_i(k,\ell) = \int\mathrm{d}\chi K_i (\chi) P(k,\chi)^{1/2} j_\ell(k\chi)">
+# Calculating the non-Limber expression for the angular power spectrum using the Levin integration. 
 
-https://www.sciencedirect.com/science/article/pii/0377042794001189
+The integral is described in https://github.com/LSSTDESC/N5K/blob/master/README.md and the Levin method was originally proposed here: https://www.sciencedirect.com/science/article/pii/0377042794001189 .
+
+## Compiling
+The code is compiled by typing make install. In the main directory there is another makefile for an example main. The documentation can be created via doxygen -g doxyfile followed by doxygen doxyfile .
+Only standard libraries and the GSL are needed.
