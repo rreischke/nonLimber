@@ -3,3 +3,4 @@ html/
 doxyfile
 doxyfile.log
 .vscode
+*.a
