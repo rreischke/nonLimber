@@ -558,9 +558,6 @@ double Levin_power::Limber_kernel(double chi, void *p)
     return weight_i_tomo * weight_j_tomo / gsl_pow_2(chi);
 }
 
-void Levin_power::free_auxillary_splines()
-{
-}
 
 double Levin_power::auxillary_weight(uint i_tomo, double k)
 {
@@ -625,7 +622,6 @@ std::vector<double> Levin_power::all_C_ell(std::vector<uint> ell, bool linear)
                 }
             }
         }
-        free_auxillary_splines();
         if (ell.at(l) > min_ell_check_Limber)
         {
             #pragma omp parallel for
