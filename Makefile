@@ -1,19 +1,19 @@
-CC	= g++
+#CC	= g++
 
-SRC_PATH = ./
+SRC_PATH = ./src
 
 
 LDFLAGS = -shared
-CCFLAGS = -O3 -pedantic -Wall -fPIC -m64 -Xpreprocessor -fopenmp -std=c++11 -I$(SRC_PATH)
+CXXFLAGS = -O3 -pedantic -Wall -fPIC -m64 -Xpreprocessor -fopenmp -std=c++11 -I$(SRC_PATH)
 
 LIBDIR	= ./lib
 INCDIR	= ./include
 
-STATIC	= lib_levin.a
+STATIC	= liblevin.a
 
 
 classes = \
-	Levin_power.cpp
+	$(SRC_PATH)/Levin_power.cpp
 	
 objects	= $(classes:.cpp=.o)
 headers	= $(classes:.cpp=.h)
@@ -21,8 +21,8 @@ headers	= $(classes:.cpp=.h)
 $(STATIC): $(objects)
 	ar rv $(STATIC) $(objects)
 
-%.o: %.cpp %.h
-	$(CC) $(CCFLAGS) -c $<
+$(SRC_PATH)/%.o: %.cpp %.h
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 .PHONY: clean distclean doc
 .DEFAULT_GOAL: static

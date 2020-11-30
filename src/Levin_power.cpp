@@ -9,6 +9,13 @@ const double Levin_power::kernel_overlap_eps = 5e-6;
 
 Levin_power::Levin_power(uint number_count, std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl, std::vector<std::vector<double>> kernel, std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl)
 {
+    if(kernel.size() != chi_cl.size()) {
+        throw std::range_error("kernel dimension does not match size of chi_cl");
+    }
+    if(pk_nl.size() != z_pk.size() * k_pk.size()) {
+        throw std::range_error("Pk_nl dimension does not match sizes of z_pk and k_pk");
+    }
+
     d = 2;
     n_total = kernel.at(0).size();
     number_counts = number_count;
@@ -87,7 +94,7 @@ void Levin_power::init_splines(std::vector<double> z_bg, std::vector<double> chi
         std::vector<double> init_weight(chi_cl.size(), 0.0);
         for (uint i = 0; i < chi_cl.size(); i++)
         {
-            init_weight.at(i) = kernel[i][i_tomo];
+            init_weight.at(i) = kernel.at(i).at(i_tomo);
         }
         kernel_maximum.push_back(chi_cl.at(find_kernel_maximum(init_weight)));
         gsl_spline_init(spline_Weight.at(i_tomo), &chi_cl[0], &init_weight[0], chi_cl.size());
