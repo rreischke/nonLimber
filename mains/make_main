@@ -1,12 +1,14 @@
 ### directories ###
 CXX=g++
 LIBCOSMO_PATH= ../
+SRC_PATH = ../src
+LIB_PATH = ../lib
 CLASS_PATH= ../../class
 ### -------------------- ###
 
 
-CXXFLAGS = -O3 -m64 -Xpreprocessor -fopenmp -std=c++11 -I $(LIBCOSMO_PATH)
-LDFLAGS = -L $(LIBCOSMO_PATH)/lib -l_levin -lm -lgsl -lgslcblas -lomp 
+CXXFLAGS = -O3 -m64 -Xpreprocessor -fopenmp -std=c++11 -I $(SRC_PATH)
+LDFLAGS = -L $(LIB_PATH) -llevin -lm -lgsl -lgslcblas -lomp 
 
 OBJ = main.o
 DEPS = 
