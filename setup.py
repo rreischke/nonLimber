@@ -13,7 +13,8 @@ ext_modules = [
         ["src/Levin_power.cpp", "python/pybind11_interface.cpp"],
         cxx_std=11,
         include_dirs=["src"],
-        libraries=["m", "gsl", "gslcblas", "omp"]
+        libraries=["m", "gsl", "gslcblas", "omp"],
+        extra_compile_args=["-Xpreprocessor", "-fopenmp"],
         ),
 ]
 
