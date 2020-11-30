@@ -5,7 +5,9 @@
 #include <numeric>
 #include <omp.h>
 #include <string>
+#include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <gsl/gsl_interp2d.h>
 #include <gsl/gsl_spline2d.h>
 #include <gsl/gsl_spline.h>
