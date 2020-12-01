@@ -11,8 +11,6 @@ if __name__ == "__main__":
     print("kernels", [k for k in kernels.keys()])
     print("background", [k for k in background.keys()])
     
-    help(levinpower.LevinPower)
-
     number_count = kernels["kernels_cl"].shape[0]
     lp = levinpower.LevinPower(number_count, 
                           background["z"], background["chi"], 
@@ -20,7 +18,12 @@ if __name__ == "__main__":
                           pk["k"], pk["z"], pk["pk_lin"].flatten(), pk["pk_nl"].flatten())
 
 
-    ell  = np.arange(5) + 2
+    ell  = np.arange(2) + 2
+
+    Cl_gg, Cl_gs, Cl_ss = lp.compute_C_ells(ell)
+
+    print(len(Cl_gg), len(Cl_gs), len(Cl_ss))
+    print(Cl_gg)
 
     Cl = lp.all_C_ell(ell, True)
     Cl = np.array(Cl).reshape(len(ell),-1)

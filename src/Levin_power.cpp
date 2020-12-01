@@ -605,27 +605,26 @@ std::vector<double> Levin_power::all_C_ell(std::vector<uint> ell, bool linear)
         std::cout << "currently at multipole: " << ell.at(l) << std::endl;
         set_auxillary_splines(use_limber, ell.at(l), linear);
 #pragma omp parallel for
-        for (uint i = 0; i < n_total * n_total; i++)
+        for (uint i_tomo = 0; i_tomo < n_total; i_tomo++)
         {
-            uint i_tomo = i / n_total;
-            uint j_tomo = i - i_tomo * n_total;
-            if (i_tomo <= j_tomo)
+            for(uint j_tomo = i_tomo; j_tomo < n_total; j_tomo++)
             {
+                auto flat_idx = i_tomo*n_total + j_tomo;
                 if (use_limber[i_tomo] == 0)
                 {
-                    aux_limber.at(i) = Limber(ell.at(l), i_tomo, j_tomo, linear);
-                    if (!kernel_overlap.at(i))
+                    aux_limber.at(flat_idx) = Limber(ell.at(l), i_tomo, j_tomo, linear);
+                    if (!kernel_overlap.at(flat_idx))
                     {
-                        result.at(l * n_total * n_total + i) = aux_limber.at(i);
+                        result.at(l * n_total * n_total + flat_idx) = aux_limber.at(flat_idx);
                     }
                     else
                     {
-                        result.at(l * n_total * n_total + i) = C_ell_full(i_tomo, j_tomo);
+                        result.at(l * n_total * n_total + flat_idx) = C_ell_full(i_tomo, j_tomo);
                     }
                 }
                 else
                 {
-                    result.at(l * n_total * n_total + i) = Limber(ell.at(l), i_tomo, j_tomo, linear);
+                    result.at(l * n_total * n_total + flat_idx) = Limber(ell.at(l), i_tomo, j_tomo, linear);
                 }
             }
         }
@@ -639,7 +638,8 @@ std::vector<double> Levin_power::all_C_ell(std::vector<uint> ell, bool linear)
                     uint test_aux = n_total - i_tomo;
                     for (uint j_tomo = i_tomo; j_tomo < n_total; j_tomo++)
                     {
-                        double rel_full_limber = abs((aux_limber.at(i_tomo * n_total + j_tomo) - result.at(l * n_total * n_total + i_tomo * n_total + j_tomo))) / aux_limber.at(i_tomo * n_total + j_tomo);
+                        auto flat_idx = i_tomo*n_total + j_tomo;
+                        double rel_full_limber = abs((aux_limber.at(flat_idx) - result.at(l * n_total * n_total + flat_idx))) / aux_limber.at(flat_idx);
                         if (abs(rel_full_limber) <= limber_tolerance)
                         {
                             test_aux--;
@@ -654,6 +654,46 @@ std::vector<double> Levin_power::all_C_ell(std::vector<uint> ell, bool linear)
         }
     }
     return result;
+}
+
+std::tuple<result_Cl_type, result_Cl_type, result_Cl_type> Levin_power::compute_C_ells(std::vector<uint> ell)
+{
+    int n_tomo_A = number_counts;
+    int n_tomo_B = n_total - n_tomo_A;
+    result_Cl_type Cl_AA;
+    result_Cl_type Cl_BB;
+    result_Cl_type Cl_AB;
+
+    auto tmp_Cl = std::vector<double>(ell.size());
+
+    auto result = all_C_ell(ell, false);
+
+    for (uint i_tomo = 0; i_tomo < n_total; i_tomo++)
+    {
+        for(uint j_tomo = i_tomo; j_tomo < n_total; j_tomo++)
+        {
+            auto flat_idx = i_tomo*n_total + j_tomo;
+            for(uint l = 0; l < ell.size(); l++) 
+            {
+                tmp_Cl.at(l) = result.at(l * n_total * n_total + flat_idx);
+            }
+            // Assign to auto and cross-correlation vectors
+            if(i_tomo < n_tomo_A && j_tomo < n_tomo_A)
+            {
+                Cl_AA.push_back(tmp_Cl);
+            }
+            else if(i_tomo >= n_tomo_A && j_tomo >= n_tomo_A)
+            {
+                Cl_BB.push_back(tmp_Cl);
+            }
+            else
+            {
+                Cl_AB.push_back(tmp_Cl);
+            }
+        }
+    }
+
+    return std::make_tuple(Cl_AA, Cl_AB, Cl_BB);
 }
 
 double Levin_power::gslIntegratecquad(double (*fc)(double, void *), double a, double b)

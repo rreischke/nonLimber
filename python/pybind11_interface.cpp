@@ -22,5 +22,8 @@ PYBIND11_MODULE(levinpower, m) {
              py::call_guard<py::gil_scoped_release>(),         // Should (?) release GIL
 R"(Returns the spectra for all tomographic bin combinations (i<j) for a list of multipoles.
 The final result is of the following shape: (l * n_total * n_total + i), where l is the index of the ell list, 
-n_total is the number of tomographic bins and i = i_tomo*n_total + j_tomo.)");  // Doc string
+n_total is the number of tomographic bins and i = i_tomo*n_total + j_tomo.)")
+        .def("compute_C_ells", &Levin_power::compute_C_ells, 
+             "ell"_a,                              // Keyword arguments
+             py::call_guard<py::gil_scoped_release>());         // Should (?) release GIL;  // Doc string
 }
