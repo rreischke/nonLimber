@@ -8,6 +8,7 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
+#include <tuple>
 #include <gsl/gsl_interp2d.h>
 #include <gsl/gsl_spline2d.h>
 #include <gsl/gsl_spline.h>
@@ -15,9 +16,12 @@
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_integration.h>
+#include <gsl/gsl_sf_bessel.h>
+
 #include <cmath>
 #include <thread>
-#include <boost/math/special_functions/bessel.hpp>
+
+typedef std::vector<std::vector<double>> result_Cl_type;
 
 /**
  * This class implements the non-Limber power spectrum integral of galaxy clustering, cosmic shear and galaxy-galaxy lensing,
@@ -157,7 +161,7 @@ public:
     /**
  *  Define the vector \f$ w \f$ for the integration (see Levin) and returning the i-th component.
  */
-    double w(double chi, double k, uint ell, uint i);
+    double w(double chi, double k, uint ell, uint i, bool strict = false);
 
     /**
  *  Define the matrix \f$w^\prime = A w \f$ for the integration (see Levin) and returning the i,j component.
@@ -284,6 +288,8 @@ public:
  * (l * n_total * n_total + i), where l is the index of the ell list, n_total is the number of tomographic bins and i = i_tomo*n_total + j_tomo. 
  */
     std::vector<double> all_C_ell(std::vector<uint> ell, bool linear);
+
+    std::tuple<result_Cl_type, result_Cl_type, result_Cl_type> compute_C_ells(std::vector<uint> ell);
 };
 
 #endif
