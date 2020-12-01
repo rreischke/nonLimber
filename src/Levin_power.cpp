@@ -212,16 +212,41 @@ double Levin_power::power_nonlinear(double z, double k)
     return exp(gsl_spline2d_eval(spline_P_nl, log(k), z, acc_P_nl_k, acc_P_nl_z));
 }
 
-double Levin_power::w(double chi, double k, uint ell, uint i)
+double Levin_power::w(double chi, double k, uint ell, uint i, bool strict)
 {
-    switch (i)
+    if(!strict)
     {
-    case 0:
-        return boost::math::sph_bessel(ell, chi * k);
-    case 1:
-        return boost::math::sph_bessel(ell - 1, chi * k);
+        switch (i)
+        {
+            case 0:
+                return gsl_sf_bessel_jl(ell, chi * k);
+            case 1:
+                return gsl_sf_bessel_jl(ell - 1, chi * k);
+            default:
+                return 0.0;
+        }
     }
-    return 0.0;
+    else
+    {
+        gsl_sf_result r;
+        int status;
+        switch (i)
+        {
+            case 0:
+                status = gsl_sf_bessel_jl_e(ell, chi * k, &r);
+                break;
+            case 1:
+                status = gsl_sf_bessel_jl_e(ell - 1, chi * k, &r);
+                break;
+            default:
+                return 0.0;
+        }
+        if(status != GSL_SUCCESS)
+        {
+            std::cerr << "Failed to compute spherical Bessel function for ell=" << ell-i << std::endl;
+        }
+        return r.val;
+    }
 }
 
 double Levin_power::A_matrix(uint i, uint j, double chi, double k, uint ell)

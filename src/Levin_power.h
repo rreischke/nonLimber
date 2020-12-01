@@ -16,9 +16,10 @@
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_integration.h>
+#include <gsl/gsl_sf_bessel.h>
+
 #include <cmath>
 #include <thread>
-#include <boost/math/special_functions/bessel.hpp>
 
 typedef std::vector<std::vector<double>> result_Cl_type;
 
@@ -160,7 +161,7 @@ public:
     /**
  *  Define the vector \f$ w \f$ for the integration (see Levin) and returning the i-th component.
  */
-    double w(double chi, double k, uint ell, uint i);
+    double w(double chi, double k, uint ell, uint i, bool strict = false);
 
     /**
  *  Define the matrix \f$w^\prime = A w \f$ for the integration (see Levin) and returning the i,j component.
