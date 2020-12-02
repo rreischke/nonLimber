@@ -15,6 +15,7 @@ ext_modules = [
         include_dirs=["src"],
         libraries=["m", "gsl", "gslcblas", "omp"],
         extra_compile_args=["-Xpreprocessor", "-fopenmp"],
+        define_macros=[("PYTHON_BINDING", None)],
         ),
 ]
 

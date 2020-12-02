@@ -17,10 +17,14 @@
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_integration.h>
 #include <gsl/gsl_sf_bessel.h>
-
 #include <cmath>
 #include <thread>
 
+#ifdef PYTHON_BINDING
+#include <Python.h>
+#include <pybind11/pybind11.h>
+namespace py = pybind11;
+#endif
 typedef std::vector<std::vector<double>> result_Cl_type;
 
 /**

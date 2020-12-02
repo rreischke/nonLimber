@@ -627,14 +627,26 @@ std::vector<double> Levin_power::all_C_ell(std::vector<uint> ell, bool linear)
     std::vector<double> aux_limber(n_total * n_total, 0.0);
     for (uint l = 0; l < ell.size(); l++)
     {
+#ifdef PYTHON_BINDING
+        // Allow to interrupt the code with Ctrl-C
+        if (PyErr_CheckSignals() != 0)
+        {
+            throw py::error_already_set();
+        }
+#endif
         std::cout << "currently at multipole: " << ell.at(l) << std::endl;
         set_auxillary_splines(use_limber, ell.at(l), linear);
 #pragma omp parallel for
-        for (uint i_tomo = 0; i_tomo < n_total; i_tomo++)
+        for(uint flat_idx = 0; flat_idx < n_total*n_total; flat_idx++)
         {
-            for(uint j_tomo = i_tomo; j_tomo < n_total; j_tomo++)
+            // Loop over flat index to allow for more aggressive parallelisation
+            uint j_tomo = flat_idx % n_total;
+            uint i_tomo = (flat_idx - j_tomo) / n_total;
+
+            // std::cout << flat_idx << " " << i_tomo << " " << j_tomo << std::flush;
+            
+            if(i_tomo <= j_tomo)
             {
-                auto flat_idx = i_tomo*n_total + j_tomo;
                 if (use_limber[i_tomo] == 0)
                 {
                     aux_limber.at(flat_idx) = Limber(ell.at(l), i_tomo, j_tomo, linear);
