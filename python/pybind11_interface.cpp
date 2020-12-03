@@ -24,5 +24,6 @@ The final result is of the following shape: (l * n_total * n_total + i), where l
 n_total is the number of tomographic bins and i = i_tomo*n_total + j_tomo.)")
         .def("compute_C_ells", &Levin_power::compute_C_ells, 
              "ell"_a                              // Keyword arguments
-             );         
+             )
+        .def_property_readonly("kernel_overlap", &Levin_power::get_kernel_overlap);         
 }

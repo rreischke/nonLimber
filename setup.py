@@ -11,7 +11,7 @@ __version__ = "0.0.1"
 ext_modules = [
     Pybind11Extension("levinpower",
         ["src/Levin_power.cpp", "python/pybind11_interface.cpp"],
-        cxx_std=11,
+        cxx_std=14,
         include_dirs=["src"],
         libraries=["m", "gsl", "gslcblas", "omp"],
         extra_compile_args=["-Xpreprocessor", "-fopenmp"],

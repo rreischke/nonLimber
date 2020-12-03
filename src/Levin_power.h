@@ -17,6 +17,7 @@
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_integration.h>
 #include <gsl/gsl_sf_bessel.h>
+//#include <boost/math/special_functions/bessel.hpp>
 #include <cmath>
 #include <thread>
 
@@ -26,6 +27,8 @@
 namespace py = pybind11;
 #endif
 typedef std::vector<std::vector<double>> result_Cl_type;
+
+bool all(const std::vector<bool> & v);
 
 /**
  * This class implements the non-Limber power spectrum integral of galaxy clustering, cosmic shear and galaxy-galaxy lensing,
@@ -263,7 +266,7 @@ public:
  * for a given multipole and in all tomographic bins and as a function of the waavenumber k. The interpolation is logarithmically
  * in wavenumbers.
  */
-    void set_auxillary_splines(std::vector<uint> use_limber, uint ell, bool linear);
+    void set_auxillary_splines(std::vector<std::vector<bool>> use_limber, uint ell, bool linear);
 
     /**
 * Returns the interpolation to the integral
@@ -294,6 +297,9 @@ public:
     std::vector<double> all_C_ell(std::vector<uint> ell, bool linear);
 
     std::tuple<result_Cl_type, result_Cl_type, result_Cl_type> compute_C_ells(std::vector<uint> ell);
+
+   std::tuple<std::vector<bool>, std::vector<bool>, std::vector<bool>> get_kernel_overlap();
+
 };
 
 #endif

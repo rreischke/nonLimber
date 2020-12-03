@@ -7,6 +7,11 @@ const double Levin_power::tol_rel = 1.0e-8;
 const double Levin_power::min_sv = 1.0e-10;
 const double Levin_power::kernel_overlap_eps = 5e-6;
 
+bool all(const std::vector<bool> & v)
+{
+   return std::all_of(v.begin(), v.end(), [](bool val){return val;});
+}
+
 Levin_power::Levin_power(uint number_count, std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl, std::vector<std::vector<double>> kernel, std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl)
 {
     if(kernel.size() != chi_cl.size()) {
@@ -214,39 +219,48 @@ double Levin_power::power_nonlinear(double z, double k)
 
 double Levin_power::w(double chi, double k, uint ell, uint i, bool strict)
 {
-    if(!strict)
+    // try
+    // {
+    //     switch (i)
+    //     {
+    //         case 0:
+    //             return boost::math::sph_bessel(ell, chi * k, 
+    //                             boost::math::policies::make_policy(boost::math::policies::promote_double<true>(),
+    //                                                             boost::math::policies::overflow_error<boost::math::policies::throw_on_error>(),
+    //                                                             boost::math::policies::underflow_error<boost::math::policies::throw_on_error>()));
+    //         case 1:
+    //             return boost::math::sph_bessel(ell-1, chi * k, 
+    //                             boost::math::policies::make_policy(boost::math::policies::promote_double<true>(),
+    //                                                             boost::math::policies::overflow_error<boost::math::policies::throw_on_error>(),
+    //                                                             boost::math::policies::underflow_error<boost::math::policies::throw_on_error>()));
+    //         default:
+    //             return 0.0;
+    //     }
+    // }
+    // catch(std::underflow_error)
+    // {
+    //     //std::cout << "Got underflow error at ell=" << ell << " x=" << chi*k << std::endl;
+    // }
+
+    gsl_sf_result r;
+    int status;
+
+    switch (i)
     {
-        switch (i)
-        {
-            case 0:
-                return gsl_sf_bessel_jl(ell, chi * k);
-            case 1:
-                return gsl_sf_bessel_jl(ell - 1, chi * k);
-            default:
-                return 0.0;
-        }
+        case 0:
+            status = gsl_sf_bessel_jl_e(ell, chi * k, &r);
+            break;
+        case 1:
+            status = gsl_sf_bessel_jl_e(ell - 1, chi * k, &r);
+            break;
+        default:
+            return 0.0;
     }
-    else
+    if(status != GSL_SUCCESS && strict)
     {
-        gsl_sf_result r;
-        int status;
-        switch (i)
-        {
-            case 0:
-                status = gsl_sf_bessel_jl_e(ell, chi * k, &r);
-                break;
-            case 1:
-                status = gsl_sf_bessel_jl_e(ell - 1, chi * k, &r);
-                break;
-            default:
-                return 0.0;
-        }
-        if(status != GSL_SUCCESS)
-        {
-            std::cerr << "Failed to compute spherical Bessel function for ell=" << ell-i << std::endl;
-        }
-        return r.val;
+        std::cerr << "Failed to compute spherical Bessel function for ell=" << ell-i << ", x=" << chi*k << ", got " << r.val << std::endl;
     }
+    return r.val;
 }
 
 double Levin_power::A_matrix(uint i, uint j, double chi, double k, uint ell)
@@ -525,13 +539,13 @@ double Levin_power::levin_integrate_bessel(double k, uint ell, uint i_tomo, bool
     return iterate(chi_min, chi_max, n_col, i_tomo, k, ell, n_sub, false, linear) * k;
 }
 
-void Levin_power::set_auxillary_splines(std::vector<uint> use_limber, uint ell, bool linear)
+void Levin_power::set_auxillary_splines(std::vector<std::vector<bool>> use_limber, uint ell, bool linear)
 {
     for (uint i_tomo = 0; i_tomo < n_total; i_tomo++)
     {
         std::vector<double> k_interp_i_tomo(N_interp);
         std::vector<double> I_bessel_i_tomo(N_interp);
-        if (use_limber[i_tomo] == 0)
+        if (!all(use_limber.at(i_tomo)))
         {
             double kmin_i_tomo = GSL_MAX(0.1 * (ell + 0.5) / kernel_maximum.at(i_tomo), k_min);
             double kmax_i_tomo = GSL_MIN(10.0 * (ell + 0.5) / kernel_maximum.at(i_tomo), k_max);
@@ -622,9 +636,25 @@ double Levin_power::C_ell_full(uint i_tomo, uint j_tomo)
 
 std::vector<double> Levin_power::all_C_ell(std::vector<uint> ell, bool linear)
 {
+    int n_tomo_A = number_counts;
+    int n_tomo_B = n_total - n_tomo_A;
+
     std::vector<double> result(ell.size() * n_total * n_total, 0.0);
-    std::vector<uint> use_limber(n_total, 0);
+
+    std::vector<std::vector<bool>> use_limber;
+    std::generate_n(std::back_inserter(use_limber), n_total, 
+                                [n_total=n_total,i=int(0)]() mutable 
+                                {
+                                    return std::vector<bool>(n_total-i++, false);
+                                });
+    
+    int n_independent_bins = n_tomo_A*(n_tomo_A+1)/2 + n_tomo_B*(n_tomo_B+1)/2 + n_tomo_A*n_tomo_B;
+
     std::vector<double> aux_limber(n_total * n_total, 0.0);
+
+    // Disable GSL errors (the Gamma function called in the Bessel functions can underflow)
+    gsl_error_handler_t *old_error_handler=gsl_set_error_handler_off();
+
     for (uint l = 0; l < ell.size(); l++)
     {
 #ifdef PYTHON_BINDING
@@ -634,7 +664,28 @@ std::vector<double> Levin_power::all_C_ell(std::vector<uint> ell, bool linear)
             throw py::error_already_set();
         }
 #endif
-        std::cout << "currently at multipole: " << ell.at(l) << std::endl;
+
+        int n_limber_bins = std::accumulate(use_limber.begin(), use_limber.end(), 0,
+                                                            [](int count, const std::vector<bool> & bins)
+                                                            {
+                                                                return count + std::accumulate(bins.begin(), bins.end(), 0);
+                                                            }
+                                                            );
+
+        std::cout << "Currently at multipole: " << ell.at(l) << ". Using Limber for " << n_limber_bins << "/" << n_independent_bins << " bins." <<std::endl;
+        std::cout << "Using non-Limber for ";
+        std::for_each(use_limber.begin(), use_limber.end(), 
+                      [i=int(0)](const std::vector<bool>& v) mutable
+                      {
+                          std::for_each(v.begin(), v.end(), [i,j=int(0)](const bool& b) mutable
+                          {
+                              if(!b) std::cout << i << "-" << i+j << " ";
+                              j++;
+                          });
+                          i++;
+                      });
+        std::cout << std::endl;
+
         set_auxillary_splines(use_limber, ell.at(l), linear);
 #pragma omp parallel for
         for(uint flat_idx = 0; flat_idx < n_total*n_total; flat_idx++)
@@ -647,7 +698,7 @@ std::vector<double> Levin_power::all_C_ell(std::vector<uint> ell, bool linear)
             
             if(i_tomo <= j_tomo)
             {
-                if (use_limber[i_tomo] == 0)
+                if(!use_limber.at(i_tomo).at(j_tomo-i_tomo))
                 {
                     aux_limber.at(flat_idx) = Limber(ell.at(l), i_tomo, j_tomo, linear);
                     if (!kernel_overlap.at(flat_idx))
@@ -670,26 +721,25 @@ std::vector<double> Levin_power::all_C_ell(std::vector<uint> ell, bool linear)
             #pragma omp parallel for
             for (uint i_tomo = 0; i_tomo < n_total; i_tomo++)
             {
-                if (use_limber.at(i_tomo) == 0)
+                for (uint j_tomo = i_tomo; j_tomo < n_total; j_tomo++)
                 {
-                    uint test_aux = n_total - i_tomo;
-                    for (uint j_tomo = i_tomo; j_tomo < n_total; j_tomo++)
+                    if(!use_limber.at(i_tomo).at(j_tomo-i_tomo))
                     {
                         auto flat_idx = i_tomo*n_total + j_tomo;
                         double rel_full_limber = abs((aux_limber.at(flat_idx) - result.at(l * n_total * n_total + flat_idx))) / aux_limber.at(flat_idx);
                         if (abs(rel_full_limber) <= limber_tolerance)
                         {
-                            test_aux--;
+                            // std::cout << "i: " << i_tomo << " j: " << j_tomo << " set to Limber for ell>" << ell.at(l) << std::endl;
+                            use_limber.at(i_tomo).at(j_tomo-i_tomo) = true;
                         }
-                    }
-                    if (test_aux == 0)
-                    {
-                        use_limber.at(i_tomo) = 1;
-                    }
+                    } 
                 }
             }
         }
     }
+
+    // Re-enable GSL errors
+    gsl_set_error_handler(old_error_handler);
     return result;
 }
 
@@ -731,6 +781,37 @@ std::tuple<result_Cl_type, result_Cl_type, result_Cl_type> Levin_power::compute_
     }
 
     return std::make_tuple(Cl_AA, Cl_AB, Cl_BB);
+}
+
+std::tuple<std::vector<bool>, std::vector<bool>, std::vector<bool>> Levin_power::get_kernel_overlap()
+{
+    int n_tomo_A = number_counts;
+    int n_tomo_B = n_total - n_tomo_A;
+
+    std::vector<bool> overlap_AA;
+    std::vector<bool> overlap_BB;
+    std::vector<bool> overlap_AB;
+
+    for (uint i_tomo = 0; i_tomo < n_total; i_tomo++)
+    {
+        for(uint j_tomo = i_tomo; j_tomo < n_total; j_tomo++)
+        {
+            auto flat_idx = i_tomo*n_total + j_tomo;
+            if(i_tomo < n_tomo_A && j_tomo < n_tomo_A)
+            {
+                overlap_AA.push_back(kernel_overlap.at(flat_idx));
+            }
+            else if(i_tomo >= n_tomo_A && j_tomo >= n_tomo_A)
+            {
+                overlap_BB.push_back(kernel_overlap.at(flat_idx));
+            }
+            else
+            {
+                overlap_AB.push_back(kernel_overlap.at(flat_idx));
+            }
+        }
+    }
+    return std::make_tuple(overlap_AA, overlap_AB, overlap_BB);
 }
 
 double Levin_power::gslIntegratecquad(double (*fc)(double, void *), double a, double b)
