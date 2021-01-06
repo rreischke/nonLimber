@@ -52,6 +52,7 @@
         "cinttypes": "cpp",
         "chrono": "cpp",
         "ratio": "cpp",
-        "thread": "cpp"
+        "thread": "cpp",
+        "stop_token": "cpp"
     }
 }

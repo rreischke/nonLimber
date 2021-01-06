@@ -77,37 +77,68 @@ int main()
         }
     }
     in_pk.close();
-// Input definitions done
+    // Input definitions done
 
-// Constructing the input of the class
+    // Constructing the input of the class
     Levin_power lp(10, z_bg, chi_bg, chi_cl, kernel, k_pk, z_pk, pk_l, pk_nl);
 
- // Define output file    
+    // Define output file
     std::fstream test;
-    test.open("test.txt", std::ios::out);
-    uint N = 50;
+    test.open("test2.txt", std::ios::out);
+    uint N = 1998;
+    double ellmin = 2;
+    double ellmax = 2000;
+    double elllin = 10;
     std::vector<uint> ell(N, 0.0);
     for (uint i = 0; i < N; i++)
     {
-        ell.at(i) = 2 + i;
+        ell.at(i) = i + ellmin;
     }
     std::vector<double> result(ell.size() * Ntomo * Ntomo, 0.0);
     auto start = high_resolution_clock::now();
-    result = lp.all_C_ell(ell, true);
+    result = lp.all_C_ell(ell, false);
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(stop - start);
-    std::cout << duration.count()/1.0e6 << "s" << std::endl;
+    std::cout << duration.count() / 1.0e6 << "s" << std::endl;
     for (uint i = 0; i < N; i++)
     {
+        std::cout << i << std::endl;
         test << ell.at(i);
         for (uint j = 0; j < Ntomo * Ntomo; j++)
         {
             uint i_tomo = j / Ntomo;
             uint j_tomo = j - i_tomo * Ntomo;
-            test << " " << result[i * Ntomo * Ntomo + j] << " " << lp.Limber(ell.at(i), i_tomo, j_tomo, true);
+            test << " " << result[i * Ntomo * Ntomo + j] << " " << lp.Limber(ell.at(i), i_tomo, j_tomo, false);
         }
         test << std::endl;
     }
+  /*  std::vector<uint> use_limber(Ntomo);
+    for (uint i = 0; i < Ntomo; i++)
+    {
+        use_limber.at(i) = 0;
+    }
+    //lp.set_auxillary_splines(use_limber, 50, false);
+    N = 500;
+    double kmin = 1.0e-4;
+    double kmax = 1.0e0;
+    for (uint j = 0; j < N; j++)
+    {
+        double k = exp(log(kmin) + (log(kmax) - log(kmin)) / (N - 1.0) * j);
+        test << k << " ";
+        for (uint i = 9; i < 10; i++)
+        {
+            //  test << " " << lp.auxillary_weight(i, k);
+            test << lp.levin_integrate_bessel(k, 10, i, true)
+                 << " " << lp.levin_integrate_bessel(k, 20, i, true)
+                 << " " << lp.levin_integrate_bessel(k, 40, i, true)
+                 << " " << lp.levin_integrate_bessel(k, 80, i, true)
+                 << " " << lp.levin_integrate_bessel(k, 160, i, true)
+                 << " " << lp.levin_integrate_bessel(k, 320, i, true)
+                 << " " << lp.levin_integrate_bessel(k, 760, i, true)
+                 << " " << lp.levin_integrate_bessel(k, 1500, i, true);
+        }
+        test << std::endl;
+    }*/
     test.close();
     return 0;
 }

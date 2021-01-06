@@ -9,9 +9,9 @@ import multiprocessing
 
 ngg = 10
 ntotal_spec = 15
-spectra = np.loadtxt("./mains/test.txt")
-N = len(spectra[:,0] )
-x = spectra[:,0] 
+spectra = np.loadtxt("./../mains/test2.txt")
+N = len(spectra[:, 0])
+x = spectra[:, 0]
 ntotal = 5
 fontsi = 8
 fontsi2 = 8
@@ -34,22 +34,24 @@ for i in range(ntotal):
 #    for j in range(a, ntotal):
 #        ax[i, j].set_xticklabels([])
 
-for i in range(ntotal):
-    for j in range(i, ntotal):
+for i in range(5,10):
+    for j in range(i, 10):
         #ax[i, j].set_yscale('log')
-        ax[i, j].set_xscale('log')
+        ax[i-5, j-5].set_xscale('log')
         y = np.zeros(N)
         y1 = np.zeros(N)
-        print(i,j,2*(i+ngg)*ntotal_spec + 2*(j+ngg) + 1)
+        print(i, j, 2*(i)*ntotal_spec + 2*(j) + 1)
         for a in range(N):
             #y[a] = x[a]*(x[a]+1)*spectra[a,2*i*ntotal_spec + 2*j + 1]
             #y1[a] = x[a]*(x[a]+1)*spectra[a,2*i*ntotal_spec + 2*j + 2]
-            y[a] = x[a]*(x[a]+1)*spectra[a,2*(i+ngg)*ntotal_spec + 2*(j+ngg) + 1]
-            y1[a] = x[a]*(x[a]+1)*spectra[a,2*(i+ngg)*ntotal_spec + 2*(j+ngg) + 2]
-        ax[i, j].plot(x, y, ls="-", color="blue", lw=1)
-        ax[i, j].plot(x, y1, ls="-", color="blue", lw=1)
+            y[a] = spectra[a, 2*(i)*ntotal_spec + 2*(j) + 1]
+            y1[a] = spectra[a, 2*(i)*ntotal_spec + 2*(j) + 2]
+        #ax[i-5, j-10].plot(x, 100.0*(y/y1 - 1.0), ls="-", color="blue", lw=1)
+        ax[i-5, j-5].plot(x, 100*(y/y1-1), ls="-", color="blue", lw=1)
+       # ax[i, j-10].plot(x, y1, ls="--", color="red", lw=1)
+        #ax[i, j].plot(x, y1, ls="-", color="blue", lw=1)
         #ax[i, j].plot(x, y1, ls="--", color="red", lw=2)
-        ax[i, j].set_xlim(x[0],x[len(x)-1])
+        #ax[i, j].set_xlim(x[0],x[len(x)-1])
         # ax[i, j].plot(x, y1 , label =r"\mathrm{Limber}", ls="-", color="blue")
         # ax[i, j].set_xscale('log')
 
@@ -68,6 +70,6 @@ plt.subplots_adjust(hspace=0.5)
 # leg = ax[0, 0].legend(fancybox=True, loc='upper right',
 # fontsize=fontsi, frameon=False)
 
-#plt.tight_layout()
+# plt.tight_layout()
 
 plt.savefig('Spectra_full_sh.pdf')

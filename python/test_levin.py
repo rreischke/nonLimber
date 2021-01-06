@@ -3,9 +3,9 @@ import levinpower
 import numpy as np
 
 if __name__ == "__main__":
-    pk = np.load("data/pk.npz")
-    kernels = np.load("data/kernels.npz")
-    background = np.load("data/background.npz")
+    pk = np.load("./../data/pk.npz")
+    kernels = np.load("./../data/kernels.npz")
+    background = np.load("./../data/background.npz")
 
     print("pk", [k for k in pk.keys()])
     print("kernels", [k for k in kernels.keys()])
