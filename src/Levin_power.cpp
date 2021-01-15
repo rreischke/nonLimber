@@ -1,9 +1,9 @@
 #include "Levin_power.h"
 
 const double Levin_power::min_interval = 1.e-2;
-const double Levin_power::limber_tolerance = 1.0e-3;
-const double Levin_power::tol_abs = 1.0e-10;
-const double Levin_power::tol_rel = 1.0e-8;
+const double Levin_power::limber_tolerance = 1.0e-2;
+const double Levin_power::tol_abs = 1.0e-20;
+const double Levin_power::tol_rel = 1.0e-6;
 const double Levin_power::min_sv = 1.0e-10;
 const double Levin_power::kernel_overlap_eps = 5e-6;
 
@@ -535,7 +535,7 @@ std::vector<double> Levin_power::linear_spaced(double min, double max, uint N)
 double Levin_power::levin_integrate_bessel(double k, uint ell, uint i_tomo, bool linear)
 {
     uint n_col = 8;
-    uint n_sub = 16;
+    uint n_sub = 32;
     return iterate(chi_min, chi_max, n_col, i_tomo, k, ell, n_sub, false, linear) * k;
 }
 
@@ -816,8 +816,8 @@ std::tuple<std::vector<bool>, std::vector<bool>, std::vector<bool>> Levin_power:
 
 double Levin_power::gslIntegratecquad(double (*fc)(double, void *), double a, double b)
 {
-    double tiny = 1.0e-9;
-    double tol = 1.0e-9;
+    double tiny = 0.0;
+    double tol = 1.0e-6;
     gsl_function gf;
     gf.function = fc;
     gf.params = this;
