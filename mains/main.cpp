@@ -84,8 +84,44 @@ int main()
 
     // Define output file
     std::fstream test;
-    test.open("test2.txt", std::ios::out);
-    uint N = 1998;
+    test.open("./test.txt", std::ios::out);
+    uint N = 6;
+    double kmin = 1e-3;
+    double kmax = 0.1;
+    lp.set_auxillary_splines(23, false);
+    std::cout << lp.C_ell_full(6, 6) << std::endl;
+    /*for (uint i = 0; i < N; i++)
+    {
+        uint ell = 20 + i;
+        lp.set_auxillary_splines(ell, false);
+        //double k = exp(log(kmin) + (log(kmax) - log(kmin)) / (N - 1.0) * i);
+        //test << ell << " " << lp.Limber(ell,0,3,false) << " " << lp.extended_Limber(ell,0,3) << std::endl;
+        //test << k;
+        //for (uint j = 0; j < 10; j++)
+        // {
+        //    test << " " << lp.auxillary_weight(j, k);
+        //}
+        //test << std::endl;
+        test << ell << " " << lp.C_ell_full(6, 6) << std::endl;
+    }*/
+    /*
+    uint M = 5;
+    for (uint i = 0; i < M; i++)
+    {
+        double final = 0.0;
+        lp.set_auxillary_splines(i+2,false);
+#pragma omp parallel for
+        for (uint j = 0; j < N; j++)
+        {
+            double k = exp(log(kmin) + (log(kmax) - log(kmin)) / (N - 1.0) * j);
+            double dk = (log(kmax) - log(kmin)) / (N - 1.0) * k;
+            double bessel = lp.levin_integrate_bessel(k, i + 2, 9, false);
+            final += bessel * bessel * dk;
+        }
+        test << i + 2 << " " << final << " " << lp.C_ell_full(9,9) << std::endl;
+    }
+*/
+    /*uint N = 1998;
     double ellmin = 2;
     double ellmax = 2000;
     double elllin = 10;
@@ -108,11 +144,11 @@ int main()
         {
             uint i_tomo = j / Ntomo;
             uint j_tomo = j - i_tomo * Ntomo;
-            test << " " << result[i * Ntomo * Ntomo + j] << " " << lp.Limber(ell.at(i), i_tomo, j_tomo, false);
+            test << " " << result[i * Ntomo * Ntomo + j];// << " " << lp.Limber(ell.at(i), i_tomo, j_tomo, false);
         }
         test << std::endl;
-    }
-  /*  std::vector<uint> use_limber(Ntomo);
+    }*/
+    /*  std::vector<uint> use_limber(Ntomo);
     for (uint i = 0; i < Ntomo; i++)
     {
         use_limber.at(i) = 0;

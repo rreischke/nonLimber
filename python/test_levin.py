@@ -1,6 +1,7 @@
 import levinpower
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
     pk = np.load("./../data/pk.npz")
@@ -18,13 +19,19 @@ if __name__ == "__main__":
                           pk["k"], pk["z"], pk["pk_lin"].flatten(), pk["pk_nl"].flatten())
 
 
-    ell  = np.arange(2) + 2
-
+    ell  = np.arange(2,2001,1)
+    print(ell)
     Cl_gg, Cl_gs, Cl_ss = lp.compute_C_ells(ell)
 
-    print(len(Cl_gg), len(Cl_gs), len(Cl_ss))
-    print(Cl_gg)
+    print(len(Cl_gg[0]), len(Cl_gs), len(Cl_ss))
+    #print(Cl_gg)
 
+    plt.plot(ell, Cl_gg[0])
+    plt.plot(ell, Cl_gg[1])
+    plt.plot(ell, Cl_gg[2])
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.show()
     Cl = lp.all_C_ell(ell, True)
     Cl = np.array(Cl).reshape(len(ell),-1)
 

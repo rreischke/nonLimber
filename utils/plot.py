@@ -10,6 +10,17 @@ import multiprocessing
 ngg = 10
 ntotal_spec = 15
 spectra = np.loadtxt("./../mains/test2.txt")
+data_gg = np.load("benchmarks_nl_clgg.npz")
+data_gs = np.load("benchmarks_nl_clgs.npz")
+data_ss = np.load("benchmarks_nl_clss.npz")
+
+# for i in range(len(data_gg['ls'])):
+#    print(data['ls'][i])
+for i in range (len(data_gg['ls'][:])):
+    print(data_gg['ls'][i,],end=' ')
+    for j in range(55):
+        print(data_gg['cls'][j, i],end=' ')
+    print(' ')
 N = len(spectra[:, 0])
 x = spectra[:, 0]
 ntotal = 5
@@ -26,28 +37,30 @@ max_xticks = 4
 yloc = plt.MaxNLocator(max_yticks)
 xloc = plt.MaxNLocator(max_yticks)
 for i in range(ntotal):
-    for j in range(i):
-        ax[i, j].axis('off')
-
-# for i in range(ntotal-1):
-#    a = i + 1
-#    for j in range(a, ntotal):
-#        ax[i, j].set_xticklabels([])
-
-for i in range(5,10):
-    for j in range(i, 10):
+    for j in range(ntotal):
+        if(j<=i):
+            ax[i, j].set_xticklabels([])
+        if(j>i):
+            ax[i, j].axis('off')
+flt_idx = 0
+for i in range(0, ntotal):
+    for j in range(0, i+1):
         #ax[i, j].set_yscale('log')
-        ax[i-5, j-5].set_xscale('log')
+        ax[i, j].set_xscale('log')
         y = np.zeros(N)
         y1 = np.zeros(N)
-        print(i, j, 2*(i)*ntotal_spec + 2*(j) + 1)
+        #print(i,j,flt_idx)
+        #print(i, j, 2*(i)*ntotal_spec + 2*(j) + 1)
         for a in range(N):
             #y[a] = x[a]*(x[a]+1)*spectra[a,2*i*ntotal_spec + 2*j + 1]
             #y1[a] = x[a]*(x[a]+1)*spectra[a,2*i*ntotal_spec + 2*j + 2]
-            y[a] = spectra[a, 2*(i)*ntotal_spec + 2*(j) + 1]
-            y1[a] = spectra[a, 2*(i)*ntotal_spec + 2*(j) + 2]
+            y[a] = spectra[a, flt_idx + 1]
+            y1[a] = data_gg['cls'][flt_idx, a]
+            #y1[a] = spectra[a, 2*(i)*ntotal_spec + 2*(j) + 2]
         #ax[i-5, j-10].plot(x, 100.0*(y/y1 - 1.0), ls="-", color="blue", lw=1)
-        ax[i-5, j-5].plot(x, 100*(y/y1-1), ls="-", color="blue", lw=1)
+        ax[i, j].plot(x, y, ls="-", color="blue", lw=1)
+        flt_idx += 1
+
        # ax[i, j-10].plot(x, y1, ls="--", color="red", lw=1)
         #ax[i, j].plot(x, y1, ls="-", color="blue", lw=1)
         #ax[i, j].plot(x, y1, ls="--", color="red", lw=2)
@@ -55,15 +68,7 @@ for i in range(5,10):
         # ax[i, j].plot(x, y1 , label =r"\mathrm{Limber}", ls="-", color="blue")
         # ax[i, j].set_xscale('log')
 
-for i in range(ntotal):
-    for j in range(ntotal):
-        if(i != j):
-            ax[i, j].set_xticklabels([])
-#            ax[i, j].set_yticklabels([])
-        else:
-            ax[i, j].set_xlabel(r"$\ell$", fontsize=fontsi)
-            ax[i, j].set_ylabel(
-                r"$\ell(\ell+1) C_\ell$", fontsize=fontsi)
+
 
 plt.subplots_adjust(wspace=0.5)
 plt.subplots_adjust(hspace=0.5)
