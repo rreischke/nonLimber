@@ -46,8 +46,11 @@ private:
   static const double kernel_overlap_eps;
   static const uint N_interp = 175;
   const uint N_thread_max = std::thread::hardware_concurrency();
-  std::vector<uint> ell_Limber = {15, 20, 20, 22, 35, 40, 45, 50, 50, 50, 20, 20, 20, 20, 20};
-  //  std::vector<uint> ell_Limber = {50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50};
+  //std::vector<uint> ell_Limber = {15, 20, 20, 22, 35, 40, 45, 50, 50, 50, 20, 20, 20, 20, 20};
+  //std::vector<uint> ell_Limber = {15, 20, 20, 22, 35, 40, 45, 50, 50, 50, 20, 20, 20, 20, 20};
+
+  //std::vector<uint> ell_Limber = {50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50};
+  std::vector<uint> ell_Limber = {80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80};
 
   gsl_spline2d *spline_P_l;
   gsl_spline2d *spline_P_nl;
@@ -96,6 +99,7 @@ private:
   uint *integration_variable_norm_kernel_overlap_i_tomo, *integration_variable_norm_kernel_overlap_j_tomo;
 
   double gslIntegrateqag(double (*fc)(double, void *), double a, double b);
+  double gslIntegrateqng(double (*fc)(double, void *), double a, double b);
   double gslIntegratecquad(double (*fc)(double, void *), double a, double b);
 
 public:

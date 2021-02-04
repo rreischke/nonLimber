@@ -243,7 +243,14 @@ double Levin_power::power_linear(double z, double k)
 
 double Levin_power::power_nonlinear(double z, double k)
 {
-    return exp(gsl_spline2d_eval(spline_P_nl, log(k), z, acc_P_nl_k, acc_P_nl_z));
+    if (k >= k_min)
+    {
+        return exp(gsl_spline2d_eval(spline_P_nl, log(k), z, acc_P_nl_k, acc_P_nl_z));
+    }
+    else
+    {
+        return exp(gsl_spline2d_eval_deriv_x(spline_P_nl, log(k_min), z, acc_P_nl_k, acc_P_nl_z) * (log(k) - log(k_min)) + gsl_spline2d_eval(spline_P_nl, log(k_min), z, acc_P_nl_k, acc_P_nl_z));
+    }
 }
 
 double Levin_power::w(double chi, double k, uint ell, uint i, bool strict)
@@ -360,7 +367,7 @@ double Levin_power::F_nonlinear(double chi, uint i_tomo, double k)
     else
     {
         return sqrt(power_nonlinear(z, k)) * kernels(chi, i_tomo) / (gsl_pow_2(chi) * k);
-    }   
+    }
 }
 
 std::vector<double> Levin_power::solve_LSE(double A, double B, uint col, std::vector<double> x_j, uint i_tomo, double k, uint ell, bool linear)
@@ -570,16 +577,8 @@ std::vector<double> Levin_power::linear_spaced(double min, double max, uint N)
 double Levin_power::levin_integrate_bessel(double k, uint ell, uint i_tomo, bool linear)
 {
     uint n_col = 8;
-    uint n_sub = 16;
+    uint n_sub = 10;
     gsl_set_error_handler_off();
-    /* if (i_tomo < number_counts)
-    {
-        return iterate(chi_min, chi_max, n_col, i_tomo, k, ell, n_sub, false, linear) * k;
-    }
-    else
-    {
-        return iterate(chi_min, chi_max, n_col, i_tomo, k, ell, n_sub, false, linear) / k;
-    }*/
     return iterate(chi_min, chi_max, n_col, i_tomo, k, ell, n_sub, false, linear);
 }
 
@@ -592,7 +591,7 @@ void Levin_power::set_auxillary_splines(uint ell, bool linear)
         if (ell < ell_Limber.at(i_tomo))
         {
             double kmin_i_tomo = GSL_MAX(0.5 * (ell + 0.5) / kernel_maximum.at(i_tomo), k_min);
-            double kmax_i_tomo = GSL_MIN(9.0 * (ell + 0.5) / kernel_maximum.at(i_tomo), k_max);
+            double kmax_i_tomo = GSL_MIN(8.0 * (ell + 0.5) / kernel_maximum.at(i_tomo), k_max);
             if (ell <= 10)
             {
                 kmax_i_tomo *= 3.0;
@@ -605,7 +604,11 @@ void Levin_power::set_auxillary_splines(uint ell, bool linear)
             }
             if (i_tomo >= number_counts)
             {
-                kmin_i_tomo = GSL_MAX(0.05 * (ell + 0.5) / kernel_maximum.at(i_tomo), k_min);
+                kmin_i_tomo = GSL_MAX(0.02 * (ell + 0.5) / kernel_maximum.at(i_tomo), k_min);
+                if (ell <= 10)
+                {
+                    kmin_i_tomo = 1e-5;
+                }
                 kmax_i_tomo = GSL_MIN(100.0 * (ell + 0.5) / kernel_maximum.at(i_tomo), k_max);
             }
             k_interp_i_tomo = linear_spaced(log(kmin_i_tomo), log(kmax_i_tomo), N_interp);
@@ -632,7 +635,7 @@ double Levin_power::Limber(uint ell, uint i_tomo, uint j_tomo, bool linear)
     {
         fac /= gsl_pow_2(ell + 0.5);
     }
-    if (ell < 1000)
+    if (ell < 900)
     {
         return fac * extended_Limber(ell, i_tomo, j_tomo);
     }
@@ -845,6 +848,20 @@ double Levin_power::gslIntegrateqag(double (*fc)(double, void *), double a, doub
     gsl_integration_workspace *w = gsl_integration_workspace_alloc(n);
     gsl_integration_qag(&gf, a, b, tiny, tol, n, 1, w, &y, &e);
     gsl_integration_workspace_free(w);
+    return y;
+}
+
+double Levin_power::gslIntegrateqng(double (*fc)(double, void *), double a, double b)
+{
+
+    double tiny = 0.0;
+    double tol = 1.0e-4;
+    gsl_function gf;
+    gf.function = fc;
+    gf.params = this;
+    double e, y;
+    size_t n;
+    gsl_integration_qng(&gf, a, b, tiny, tol, &y, &e, &n);
     return y;
 }
 
