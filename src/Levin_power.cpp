@@ -24,9 +24,6 @@ Levin_power::Levin_power(uint number_count, std::vector<double> z_bg, std::vecto
     init_splines(z_bg, chi_bg, chi_cl, kernel, k_pk, z_pk, pk_l, pk_nl);
     check_kernel_overlap();
     tables_result_set = false;
-    //ell_eLimber = {15, 20, 20, 23, 35, 40, 45, 50, 50, 50, 20, 20, 20, 20, 20};
-    ell_eLimber = {30, 50, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80};
-    
 }
 
 Levin_power::~Levin_power()
@@ -219,6 +216,10 @@ void Levin_power::check_kernel_overlap()
                 kernel_overlap.at(i_tomo * n_total + j_tomo) = false;
             }
         }
+    }
+    for (uint i = 0; i < n_total; i++)
+    {
+        ell_eLimber.push_back(ellmax_non_limber);
     }
 }
 
@@ -778,7 +779,7 @@ double Levin_power::C_ell_full(uint i_tomo, uint j_tomo)
     uint tid = omp_get_thread_num();
     integration_variable_i_tomo[tid] = i_tomo;
     integration_variable_j_tomo[tid] = j_tomo;
-    double min = 1e-4; //(GSL_MIN(aux_kmin.at(i_tomo), aux_kmin.at(j_tomo)));
+    double min = k_min; //(GSL_MIN(aux_kmin.at(i_tomo), aux_kmin.at(j_tomo)));
     double max = (GSL_MAX(aux_kmax.at(i_tomo), aux_kmax.at(j_tomo)));
     return 2.0 / M_PI * gslIntegrateqag(k_integration_kernel, log(min), log(max));
 }
@@ -808,6 +809,16 @@ std::vector<double> Levin_power::all_C_ell(std::vector<uint> ell, bool linear)
                 if ((ell.at(l) < ell_eLimber.at(i_tomo) && ell.at(l) < ell_eLimber.at(j_tomo)))
                 {
                     result.at(l * n_total * n_total + flat_idx) = facaux * C_ell_full(i_tomo, j_tomo);
+                    double aux;
+                    if (ell.at(l) < ell_eLimber.at(j_tomo) && i_tomo == j_tomo)
+                    {
+                        aux = facaux * Limber(ell.at(l), i_tomo, j_tomo, linear);
+                        double residual = (result.at(l * n_total * n_total + flat_idx) - aux) / aux;
+                        if (abs(residual) <= eLimber_rel)
+                        {
+                            ell_eLimber.at(i_tomo) = ell.at(l);
+                        }
+                    }
                 }
                 else
                 {

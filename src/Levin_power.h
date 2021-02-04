@@ -45,12 +45,12 @@ private:
   static const double min_sv;
   static const double kernel_overlap_eps;
   static const uint N_interp = 175;
+  const double eLimber_rel = 1e-5;
+  const uint ellmax_non_limber = 80;
   const uint N_thread_max = std::thread::hardware_concurrency();
-  
+
   std::vector<uint> ell_eLimber;
 
-  
-  
   gsl_spline2d *spline_P_l;
   gsl_spline2d *spline_P_nl;
   gsl_spline2d *spline_d2P_d2k;
@@ -89,6 +89,7 @@ private:
   double chi_min, chi_max;
   double k_min, k_max;
 
+
   uint *integration_variable_i_tomo, *integration_variable_j_tomo;
 
   uint *integration_variable_Limber_ell, *integration_variable_Limber_i_tomo, *integration_variable_Limber_j_tomo;
@@ -112,7 +113,7 @@ public:
  * 
  * Lengths in the code are expressed in \f$\mathrm{Mpc}\f$.
  */
-  Levin_power(uint number_count,  std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl, std::vector<std::vector<double>> kernel, std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl);
+  Levin_power(uint number_count, std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl, std::vector<std::vector<double>> kernel, std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl);
 
   /**
  * Destructor: clean up all allocated memory.
