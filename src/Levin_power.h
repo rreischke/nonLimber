@@ -46,12 +46,11 @@ private:
   static const double kernel_overlap_eps;
   static const uint N_interp = 175;
   const uint N_thread_max = std::thread::hardware_concurrency();
-  //std::vector<uint> ell_Limber = {15, 20, 20, 22, 35, 40, 45, 50, 50, 50, 20, 20, 20, 20, 20};
-  //std::vector<uint> ell_Limber = {15, 20, 20, 22, 35, 40, 45, 50, 50, 50, 20, 20, 20, 20, 20};
+  
+  std::vector<uint> ell_eLimber;
 
-  //std::vector<uint> ell_Limber = {50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50};
-  std::vector<uint> ell_Limber = {80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80};
-
+  
+  
   gsl_spline2d *spline_P_l;
   gsl_spline2d *spline_P_nl;
   gsl_spline2d *spline_d2P_d2k;
@@ -81,6 +80,7 @@ private:
   std::vector<double> kernel_norm;
   std::vector<double> table_kmin_fraction;
   std::vector<double> factor;
+  std::vector<double> bessel_low, bessel_high;
 
   uint d;
   uint n_total;
@@ -112,7 +112,7 @@ public:
  * 
  * Lengths in the code are expressed in \f$\mathrm{Mpc}\f$.
  */
-  Levin_power(uint number_count, std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl, std::vector<std::vector<double>> kernel, std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl);
+  Levin_power(uint number_count,  std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl, std::vector<std::vector<double>> kernel, std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl);
 
   /**
  * Destructor: clean up all allocated memory.

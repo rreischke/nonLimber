@@ -85,11 +85,11 @@ int main()
     // Define output file
     std::fstream test;
     test.open("./test.txt", std::ios::out);
-    uint N = 1000;
-    double kmin = 1e-5;
-    double kmax = 0.5;
-    lp.set_auxillary_splines(2, false);
-    std::cout << lp.C_ell_full(6, 6) << std::endl;
+    uint N = 10000;
+    double kmin = 1e-3;
+    double kmax = 1.0;
+    lp.set_auxillary_splines(52, false);
+    //std::cout << lp.C_ell_full(6, 6) << std::endl;
     for (uint i = 0; i < N; i++)
     {
         uint ell = 2 + i;
@@ -97,7 +97,7 @@ int main()
         double k = exp(log(kmin) + (log(kmax) - log(kmin)) / (N - 1.0) * i);
         //test << ell << " " << lp.Limber(ell,0,3,false) << " " << lp.extended_Limber(ell,0,3) << std::endl;
         test << k;
-        for (uint j = 10; j < 15; j++)
+        for (uint j = 0; j < 15; j++)
         {
             test << " " << lp.auxillary_weight(j, k);
         }
