@@ -47,6 +47,7 @@ private:
   static const uint N_interp = 175;
   const double eLimber_rel = 1e-5;
   const uint ellmax_non_limber = 80;
+  const uint maximum_number_subintervals = 10;
   const uint N_thread_max = std::thread::hardware_concurrency();
 
   std::vector<uint> ell_eLimber;
@@ -80,15 +81,17 @@ private:
   std::vector<double> kernel_norm;
   std::vector<double> table_kmin_fraction;
   std::vector<double> factor;
-  std::vector<double> bessel_low, bessel_high;
-
+  std::vector<double> chi_nodes;
+  std::vector<std::vector<std::vector<double>>> A_ell_bessel;
+  std::vector<std::vector<double>> k_min_bessel;
+  std::vector<std::vector<double>> k_max_bessel;
+  std::vector<std::vector<std::vector<double>>> k_bessel;
   uint d;
   uint n_total;
   uint number_counts;
-  bool tables_result_set;
+  uint chi_size;
   double chi_min, chi_max;
   double k_min, k_max;
-
 
   uint *integration_variable_i_tomo, *integration_variable_j_tomo;
 
@@ -119,6 +122,8 @@ public:
  * Destructor: clean up all allocated memory.
  */
   ~Levin_power();
+
+  void init_Bessel();
 
   /**
  *  Finds the index of the maximum of a list with a global maximum.
@@ -179,6 +184,8 @@ public:
  *  Define the vector \f$ w \f$ for the integration (see Levin) and returning the i-th component.
  */
   double w(double chi, double k, uint ell, uint i, bool strict = false);
+
+  double w_precomputed(double chi, double k, uint ell, uint i, uint i_tomo);
 
   /**
  *  Define the matrix \f$w^\prime = A w \f$ for the integration (see Levin) and returning the i,j component.
@@ -317,6 +324,8 @@ public:
  * Returns \f$ C_{ij}(\ell)\f $. Note that the splines for the weights have to be set. Do NOT call this function in the main.
  */
   double C_ell_full(uint i_tomo, uint j_tomo);
+  
+  uint getIndex(std::vector<double> v, double val);
 
   /**
  * Returns the spectra for all tomographic bin combinations (i<j) for a list of multipoles. The final result is of the following shape:

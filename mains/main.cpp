@@ -5,9 +5,6 @@
 
 using namespace std::chrono;
 
-
-
-
 int main()
 {
 
@@ -85,7 +82,12 @@ int main()
     // Input definitions done
 
     // Constructing the input of the class
+    auto start = high_resolution_clock::now();
+
     Levin_power lp(10, z_bg, chi_bg, chi_cl, kernel, k_pk, z_pk, pk_l, pk_nl);
+    auto stop = high_resolution_clock::now();
+    auto duration = duration_cast<microseconds>(stop - start);
+    std::cout << duration.count() / 1.0e6 << "s" << std::endl;
 
     // Define output file
     std::fstream test;
@@ -93,7 +95,8 @@ int main()
     uint N = 10000;
     double kmin = 1e-3;
     double kmax = 1.0;
-    lp.set_auxillary_splines(52, false);
+    lp.levin_integrate_bessel(1e-1, 30, 9, false);
+    /*lp.set_auxillary_splines(52, false);
     //std::cout << lp.C_ell_full(6, 6) << std::endl;
     for (uint i = 0; i < N; i++)
     {
@@ -108,7 +111,7 @@ int main()
         }
         test << std::endl;
         //test << ell << " " << lp.C_ell_full(6, 6) << std::endl;
-    }
+    }*/
     /*
     uint M = 5;
     for (uint i = 0; i < M; i++)

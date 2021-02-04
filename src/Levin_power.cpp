@@ -23,7 +23,7 @@ Levin_power::Levin_power(uint number_count, std::vector<double> z_bg, std::vecto
     number_counts = number_count;
     init_splines(z_bg, chi_bg, chi_cl, kernel, k_pk, z_pk, pk_l, pk_nl);
     check_kernel_overlap();
-    tables_result_set = false;
+    init_Bessel();
 }
 
 Levin_power::~Levin_power()
@@ -62,6 +62,58 @@ Levin_power::~Levin_power()
     {
         gsl_spline_free(spline_aux_kernel.at(i));
         gsl_interp_accel_free(acc_aux_kernel.at(i));
+    }
+}
+
+void Levin_power::init_Bessel()
+{
+    for (uint i_tomo = 0; i_tomo < n_total; i_tomo++)
+    {
+        k_min_bessel.push_back(std::vector<double>());
+        k_max_bessel.push_back(std::vector<double>());
+        k_bessel.push_back(std::vector<std::vector<double>>());
+        for (uint l = 0; l <= ellmax_non_limber; l++)
+        {
+            k_bessel.at(i_tomo).push_back(std::vector<double>(N_interp));
+            double value_min, value_max;
+            value_min = GSL_MAX(0.5 * (l + 0.5) / kernel_maximum.at(i_tomo), k_min);
+            value_max = GSL_MIN(8.0 * (l + 0.5) / kernel_maximum.at(i_tomo), k_max);
+            if (l <= 5)
+            {
+                value_max *= 3.0;
+            }
+            if (i_tomo >= number_counts)
+            {
+                value_min = GSL_MAX(0.02 * (l + 0.5) / kernel_maximum.at(i_tomo), k_min);
+                value_max = GSL_MIN(100.0 * (l + 0.5) / kernel_maximum.at(i_tomo), k_max);
+            }
+            k_min_bessel.at(i_tomo).push_back(value_min);
+            k_max_bessel.at(i_tomo).push_back(value_max);
+            k_bessel.at(i_tomo).at(l) = linear_spaced(log(k_min_bessel.at(i_tomo).at(l)), log(k_max_bessel.at(i_tomo).at(l)), N_interp);
+        }
+    }
+    chi_size = static_cast<uint>(gsl_pow_2(maximum_number_subintervals + 1.0));
+    for (uint i_chi = 0; i_chi < chi_size; i_chi++)
+    {
+        chi_nodes.push_back(chi_min + (chi_max - chi_min) / (chi_size - 1.0) * i_chi);
+    }
+    gsl_set_error_handler_off();
+    for (uint i_tomo = 0; i_tomo < n_total; i_tomo++)
+    {
+        A_ell_bessel.push_back(std::vector<std::vector<double>>());
+        for (uint l = 0; l <= ellmax_non_limber; l++)
+        {
+            A_ell_bessel.at(i_tomo).push_back(std::vector<double>(chi_size * N_interp));
+            for (uint i_chi = 0; i_chi < chi_size; i_chi++)
+            {
+#pragma omp parallel for
+                for (uint i_k = 0; i_k < N_interp; i_k++)
+                {
+                    uint flat_idx = i_chi * N_interp + i_k;
+                    A_ell_bessel.at(i_tomo).at(l).at(flat_idx) = gsl_sf_bessel_jl(l, chi_nodes.at(i_chi) * exp(k_bessel.at(i_tomo).at(l).at(i_k)));
+                }
+            }
+        }
     }
 }
 
@@ -113,27 +165,6 @@ void Levin_power::init_splines(std::vector<double> z_bg, std::vector<double> chi
     }
     chi_min = chi_cl.at(1);
     chi_max = chi_cl.at(chi_cl.size() - 2);
-    for (uint i_tomo = 0; i_tomo < kernel.at(0).size(); i_tomo++)
-    {
-        uint test_of_zero = 0;
-        double chi1 = 10000;
-        double chi2;
-        for (uint i = 0; i < chi_cl.size(); i++)
-        {
-            if (kernel.at(i).at(i_tomo) > 1e-15 && test_of_zero == 0)
-            {
-                chi1 = chi_cl.at(i);
-                test_of_zero = 1;
-            }
-            if (chi_cl.at(i) > chi1 && kernel.at(i).at(i_tomo) < 1e-15 && test_of_zero == 1)
-            {
-                chi2 = chi_cl.at(i);
-                break;
-            }
-        }
-        bessel_high.push_back(chi2);
-        bessel_low.push_back(chi1);
-    }
 
     const gsl_interp2d_type *T = gsl_interp2d_bicubic;
     acc_P_l_k = gsl_interp_accel_alloc();
@@ -308,6 +339,24 @@ double Levin_power::w(double chi, double k, uint ell, uint i, bool strict)
             std::cerr << "Failed to compute spherical Bessel function for ell=" << ell - i << std::endl;
         }
         return r.val;
+    }
+}
+
+double Levin_power::w_precomputed(double chi, double k, uint ell, uint i, uint i_tomo)
+{
+    uint i_chi, i_k;
+    switch (i)
+    {
+    case 0:
+        i_chi = getIndex(chi_nodes, chi);
+        i_k = getIndex(k_bessel.at(i_tomo).at(ell), log(k));
+        return A_ell_bessel.at(i_tomo).at(ell).at(i_chi * N_interp + i_k);
+    case 1:
+        i_chi = getIndex(chi_nodes, chi);
+        i_k = getIndex(k_bessel.at(i_tomo).at(ell), log(k));
+        return A_ell_bessel.at(i_tomo).at(ell - 1).at(i_chi * N_interp + i_k);
+    default:
+        return 0.0;
     }
 }
 
@@ -497,6 +546,7 @@ double Levin_power::integrate(double A, double B, uint col, uint i_tomo, double 
     for (uint i = 0; i < d; i++)
     {
         result += p(A, B, i, B, col, c) * w(B, k, ell, i) - p(A, B, i, A, col, c) * w(A, k, ell, i);
+        //result += p(A, B, i, B, col, c) * w_precomputed(B, k, ell, i, i_tomo) - p(A, B, i, A, col, c) * w_precomputed(A, k, ell, i, i_tomo);
     }
     return result;
 }
@@ -598,7 +648,7 @@ std::vector<double> Levin_power::linear_spaced(double min, double max, uint N)
 double Levin_power::levin_integrate_bessel(double k, uint ell, uint i_tomo, bool linear)
 {
     uint n_col = 7;
-    uint n_sub = 10;
+    uint n_sub = maximum_number_subintervals;
     gsl_set_error_handler_off();
     return iterate(chi_min, chi_max, n_col, i_tomo, k, ell, n_sub, false, linear);
 }
@@ -607,36 +657,18 @@ void Levin_power::set_auxillary_splines(uint ell, bool linear)
 {
     for (uint i_tomo = 0; i_tomo < n_total; i_tomo++)
     {
-        std::vector<double> k_interp_i_tomo(N_interp);
         std::vector<double> I_bessel_i_tomo(N_interp);
         if (ell < ell_eLimber.at(i_tomo))
         {
-            double kmin_i_tomo = GSL_MAX(0.5 * (ell + 0.5) / kernel_maximum.at(i_tomo), k_min);
-            double kmax_i_tomo = GSL_MIN(8.0 * (ell + 0.5) / kernel_maximum.at(i_tomo), k_max);
-            if (ell <= 5)
-            {
-                kmax_i_tomo *= 3.0;
-            }
-            if (ell > 40)
-            {
-                kmin_i_tomo = GSL_MAX(0.5 * (ell + 0.5) / kernel_maximum.at(i_tomo), k_min);
-                kmax_i_tomo = GSL_MIN(8.0 * (ell + 0.5) / kernel_maximum.at(i_tomo), k_max);
-            }
-            if (i_tomo >= number_counts)
-            {
-                kmin_i_tomo = GSL_MAX(0.02 * (ell + 0.5) / kernel_maximum.at(i_tomo), k_min);
-                kmax_i_tomo = GSL_MIN(100.0 * (ell + 0.5) / kernel_maximum.at(i_tomo), k_max);
-            }
-            k_interp_i_tomo = linear_spaced(log(kmin_i_tomo), log(kmax_i_tomo), N_interp);
 #pragma omp parallel for
             for (uint i = 0; i < N_interp; i++)
             {
-                I_bessel_i_tomo.at(i) = levin_integrate_bessel(exp(k_interp_i_tomo.at(i)), ell, i_tomo, linear);
+                I_bessel_i_tomo.at(i) = levin_integrate_bessel(exp(k_bessel.at(i_tomo).at(ell).at(i)), ell, i_tomo, linear);
             }
+            gsl_spline_init(spline_aux_kernel.at(i_tomo), &k_bessel.at(i_tomo).at(ell)[0], &I_bessel_i_tomo[0], N_interp);
+            aux_kmax.at(i_tomo) = exp(k_bessel.at(i_tomo).at(ell).at(k_bessel.at(i_tomo).at(ell).size() - 1));
+            aux_kmin.at(i_tomo) = exp(k_bessel.at(i_tomo).at(ell).at(0));
         }
-        gsl_spline_init(spline_aux_kernel.at(i_tomo), &k_interp_i_tomo[0], &I_bessel_i_tomo[0], N_interp);
-        aux_kmax.at(i_tomo) = exp(k_interp_i_tomo.at(k_interp_i_tomo.size() - 1));
-        aux_kmin.at(i_tomo) = exp(k_interp_i_tomo.at(0));
     }
 }
 
@@ -828,6 +860,23 @@ std::vector<double> Levin_power::all_C_ell(std::vector<uint> ell, bool linear)
         }
     }
     return result;
+}
+
+uint Levin_power::getIndex(std::vector<double> v, double val)
+{
+    uint index = 0;
+    for (uint i = 0; i < v.size(); i++)
+    {
+        if (v.at(i) == val)
+        {
+            index = i;
+            break;
+        }
+    }
+    return index;
+    /*   auto it = find(v.begin(), v.end(), val);
+    uint index = it - v.begin();
+    return index;*/
 }
 
 std::tuple<result_Cl_type, result_Cl_type, result_Cl_type> Levin_power::compute_C_ells(std::vector<uint> ell)
