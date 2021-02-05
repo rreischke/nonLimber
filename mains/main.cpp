@@ -7,7 +7,6 @@ using namespace std::chrono;
 
 int main()
 {
-
     /**
      * Sets up the input for the integration class.
      */
@@ -95,8 +94,9 @@ int main()
     uint N = 10000;
     double kmin = 1e-3;
     double kmax = 1.0;
-    lp.levin_integrate_bessel(1e-1, 30, 9, false);
-    /*lp.set_auxillary_splines(52, false);
+    //lp.levin_integrate_bessel(10, 2, 5, false);
+    //lp.levin_integrate_bessel(1e-1, 30, 9, false);
+    lp.set_auxillary_splines(85, false);
     //std::cout << lp.C_ell_full(6, 6) << std::endl;
     for (uint i = 0; i < N; i++)
     {
@@ -111,7 +111,7 @@ int main()
         }
         test << std::endl;
         //test << ell << " " << lp.C_ell_full(6, 6) << std::endl;
-    }*/
+    }
     /*
     uint M = 5;
     for (uint i = 0; i < M; i++)

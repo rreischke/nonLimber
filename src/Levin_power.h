@@ -43,11 +43,11 @@ private:
   static const double tol_rel;
   static const double limber_tolerance;
   static const double min_sv;
-  static const double kernel_overlap_eps;
   static const uint N_interp = 175;
   const double eLimber_rel = 1e-5;
-  const uint ellmax_non_limber = 80;
+  const uint ellmax_non_limber = 95;
   const uint maximum_number_subintervals = 10;
+  const uint ell_limber = 1000;
   const uint N_thread_max = std::thread::hardware_concurrency();
 
   std::vector<uint> ell_eLimber;
@@ -70,19 +70,17 @@ private:
   gsl_spline *spline_chi_of_z;
   gsl_interp_accel *acc_z_of_chi;
   gsl_spline *spline_z_of_chi;
-
   std::vector<double> kernel_maximum;
 
   std::vector<gsl_interp_accel *> acc_aux_kernel;
   std::vector<gsl_spline *> spline_aux_kernel;
   std::vector<double> aux_kmax;
   std::vector<double> aux_kmin;
-  std::vector<bool> kernel_overlap;
   std::vector<double> kernel_norm;
   std::vector<double> table_kmin_fraction;
   std::vector<double> factor;
   std::vector<double> chi_nodes;
-  std::vector<std::vector<std::vector<double>>> A_ell_bessel;
+  std::vector<std::vector<std::vector<double>>> A_ell_bessel, A_ellm1_bessel;
   std::vector<std::vector<double>> k_min_bessel;
   std::vector<std::vector<double>> k_max_bessel;
   std::vector<std::vector<std::vector<double>>> k_bessel;
@@ -92,6 +90,8 @@ private:
   uint chi_size;
   double chi_min, chi_max;
   double k_min, k_max;
+  bool bessel_set = false;
+  bool precompute;
 
   uint *integration_variable_i_tomo, *integration_variable_j_tomo;
 
@@ -99,8 +99,6 @@ private:
   uint *integration_variable_extended_Limber_ell, *integration_variable_extended_Limber_i_tomo, *integration_variable_extended_Limber_j_tomo;
 
   bool *integration_variable_Limber_linear;
-  uint *integration_variable_norm_kernel_i_tomo;
-  uint *integration_variable_norm_kernel_overlap_i_tomo, *integration_variable_norm_kernel_overlap_j_tomo;
 
   double gslIntegrateqag(double (*fc)(double, void *), double a, double b);
   double gslIntegrateqng(double (*fc)(double, void *), double a, double b);
@@ -116,7 +114,7 @@ public:
  * 
  * Lengths in the code are expressed in \f$\mathrm{Mpc}\f$.
  */
-  Levin_power(uint number_count, std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl, std::vector<std::vector<double>> kernel, std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl);
+  Levin_power(bool precompute1, uint number_count, std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl, std::vector<std::vector<double>> kernel, std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl);
 
   /**
  * Destructor: clean up all allocated memory.
@@ -125,15 +123,12 @@ public:
 
   void init_Bessel();
 
+  void set_pointer();
+
   /**
  *  Finds the index of the maximum of a list with a global maximum.
  */
   uint find_kernel_maximum(std::vector<double> kernel);
-
-  /**
- *  Computes the overlap between the kernels between all tomographic bins.
- */
-  void check_kernel_overlap();
 
   /**
  *  Initializes all splines for the distance redshift relation, the weight functions and the power spectrum.
@@ -144,22 +139,6 @@ public:
  *  Interpolation function for the weight function in tomographic bin i_tomo and comoving distance chi.
  */
   double kernels(double chi, uint i_tomo);
-
-  /**
- *  Normalized weight function, to be used only for the overlap calculation.
- */
-  double kernel_normed(double chi, uint i_tomo);
-
-  /**
- *  Integration kernel for the normalization of the weight function.
- */
-  static double normalize_kernels_kernel(double, void *);
-
-  /**
- * Integration kernel for the overlap of the weight functions.
- */
-  static double kernels_overlap_kernel(double, void *);
-
   /**
  *  Interpolation function for the comoving distance as a function of redshift.
  */
@@ -185,7 +164,7 @@ public:
  */
   double w(double chi, double k, uint ell, uint i, bool strict = false);
 
-  double w_precomputed(double chi, double k, uint ell, uint i, uint i_tomo);
+  double w_precomputed(uint i_chi, uint i_k, uint ell, uint i, uint i_tomo);
 
   /**
  *  Define the matrix \f$w^\prime = A w \f$ for the integration (see Levin) and returning the i,j component.
@@ -238,13 +217,13 @@ public:
  * \f]
  * in an interval \f$ A,B \f$ with col collocation points. The estimate of the integral is returned. 
  **/
-  double integrate(double A, double B, uint col, uint i_tomo, double k, uint ell, bool linear);
+  double integrate(uint iA, uint iB, uint col, uint i_tomo, uint i_k, uint ell, bool linear);
 
   /**
 * Iterates over the integral by bisectiong the interval with the largest error until convergence or a maximum number of bisections, smax, is reached. 
 * The final result is returned. 
  **/
-  double iterate(double A, double B, uint col, uint i_tomo, double k, uint ell, uint smax, bool verbose, bool linear);
+  double iterate(double A, double B, uint col, uint i_tomo, uint i_k, uint ell, uint smax, bool verbose, bool linear);
 
   /**
  *  Return the maximum index of a list.
@@ -263,7 +242,7 @@ public:
  * \f]
  * by iterating with the Levin method.
  */
-  double levin_integrate_bessel(double k, uint ell, uint i_tomo, bool linear);
+  double levin_integrate_bessel(uint i_k, uint ell, uint i_tomo, bool linear);
 
   /**
 * Calculates the Limber approximation to the angular ppower spectrum:
@@ -324,8 +303,10 @@ public:
  * Returns \f$ C_{ij}(\ell)\f $. Note that the splines for the weights have to be set. Do NOT call this function in the main.
  */
   double C_ell_full(uint i_tomo, uint j_tomo);
-  
+
   uint getIndex(std::vector<double> v, double val);
+
+  uint map_chi_index(double chi);
 
   /**
  * Returns the spectra for all tomographic bin combinations (i<j) for a list of multipoles. The final result is of the following shape:
