@@ -51,6 +51,7 @@ private:
   const uint N_thread_max = std::thread::hardware_concurrency();
 
   std::vector<uint> ell_eLimber;
+  std::vector<uint> ell_list, ell_list_index;
 
   gsl_spline2d *spline_P_l;
   gsl_spline2d *spline_P_nl;
@@ -74,6 +75,10 @@ private:
 
   std::vector<gsl_interp_accel *> acc_aux_kernel;
   std::vector<gsl_spline *> spline_aux_kernel;
+  std::vector<gsl_interp_accel *> acc_aux_kernel_parallel;
+  std::vector<gsl_spline *> spline_aux_kernel_parallel;
+  std::vector<double> aux_kmax_parallel;
+  std::vector<double> aux_kmin_parallel;
   std::vector<double> aux_kmax;
   std::vector<double> aux_kmin;
   std::vector<double> kernel_norm;
@@ -93,7 +98,7 @@ private:
   bool bessel_set = false;
   bool precompute;
 
-  uint *integration_variable_i_tomo, *integration_variable_j_tomo;
+  uint *integration_variable_i_tomo, *integration_variable_j_tomo, *integration_variable_ell;
 
   uint *integration_variable_Limber_ell, *integration_variable_Limber_i_tomo, *integration_variable_Limber_j_tomo;
   uint *integration_variable_extended_Limber_ell, *integration_variable_extended_Limber_i_tomo, *integration_variable_extended_Limber_j_tomo;
@@ -114,7 +119,7 @@ public:
  * 
  * Lengths in the code are expressed in \f$\mathrm{Mpc}\f$.
  */
-  Levin_power(bool precompute1, uint number_count, std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl, std::vector<std::vector<double>> kernel, std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl);
+  Levin_power(bool precompute1, std::vector<uint> ell1, uint number_count, std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl, std::vector<std::vector<double>> kernel, std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl);
 
   /**
  * Destructor: clean up all allocated memory.
@@ -264,7 +269,9 @@ public:
  */
   void set_auxillary_splines(uint ell, bool linear);
 
-  /**
+  void set_auxillary_splines_parallel(uint ell, bool linear);
+
+      /**
 * Returns the interpolation to the integral
 *\f[
 *    I_i(k) = \int\mathrm{d}\chi K_i (\chi) P(k,\chi)^{1/2} j_\ell(k\chi)
@@ -273,6 +280,8 @@ public:
  */
   double auxillary_weight(uint i_tomo, double k);
 
+  double auxillary_weight_parallel(uint i_tomo, double k, uint ell);
+
   /**
  * Integration kernel for the final integral:
 * \f[
@@ -280,6 +289,8 @@ public:
  * \f] 
  */
   static double k_integration_kernel(double, void *);
+
+  static double k_integration_kernel_parallel(double, void *);
 
   double dlnP_dlnk(double k, double z);
 
@@ -304,6 +315,8 @@ public:
  */
   double C_ell_full(uint i_tomo, uint j_tomo);
 
+  double C_ell_full_parallel(uint i_tomo, uint j_tomo, uint ell);
+
   uint getIndex(std::vector<double> v, double val);
 
   uint map_chi_index(double chi);
@@ -314,7 +327,9 @@ public:
  */
   std::vector<double> all_C_ell(std::vector<uint> ell, bool linear);
 
-  std::tuple<result_Cl_type, result_Cl_type, result_Cl_type> compute_C_ells(std::vector<uint> ell);
+  std::vector<double> all_C_ell_multipole_parallel(std::vector<uint> ell, bool linear);
+
+  std::tuple<result_Cl_type, result_Cl_type, result_Cl_type> compute_C_ells(bool ell_parallel);
 };
 
 #endif

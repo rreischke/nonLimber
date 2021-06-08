@@ -81,13 +81,9 @@ int main()
     // Input definitions done
 
     // Constructing the input of the class
-    auto start = high_resolution_clock::now();
 
-    Levin_power lp(10, z_bg, chi_bg, chi_cl, kernel, k_pk, z_pk, pk_l, pk_nl);
-    auto stop = high_resolution_clock::now();
-    auto duration = duration_cast<microseconds>(stop - start);
-    std::cout << duration.count() / 1.0e6 << "s" << std::endl;
-
+    Levin_power lp(false, 10, z_bg, chi_bg, chi_cl, kernel, k_pk, z_pk, pk_l, pk_nl);
+    
     // Define output file
     std::fstream test;
     test.open("./test.txt", std::ios::out);
@@ -96,7 +92,12 @@ int main()
     double kmax = 1.0;
     //lp.levin_integrate_bessel(10, 2, 5, false);
     //lp.levin_integrate_bessel(1e-1, 30, 9, false);
-    lp.set_auxillary_splines(85, false);
+    auto start = high_resolution_clock::now();
+    lp.set_auxillary_splines(3, false);
+    auto stop = high_resolution_clock::now();
+    auto duration = duration_cast<microseconds>(stop - start);
+    std::cout << duration.count() / 1.0e6 << "s" << std::endl;
+
     //std::cout << lp.C_ell_full(6, 6) << std::endl;
     for (uint i = 0; i < N; i++)
     {
