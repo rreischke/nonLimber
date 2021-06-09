@@ -1,5 +1,6 @@
 #include "Levin_power.h"
 #include <fstream>
+#include <algorithm>
 
 const double Levin_power::min_interval = 1.e-2;
 const double Levin_power::limber_tolerance = 1.0e-2;
