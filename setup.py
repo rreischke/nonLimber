@@ -1,4 +1,5 @@
 import sys
+import os
 from setuptools import setup
 
 # Available at setup time due to pyproject.toml
@@ -9,7 +10,8 @@ import distutils.sysconfig
 __version__ = "0.0.2"
 
 if (sys.platform[:6] == "darwin"
-        and distutils.sysconfig.get_config_var("CC") == "clang"):
+        and (distutils.sysconfig.get_config_var("CC") == "clang"
+                or os.environ.get("CC", "") == "clang")):
     compiler_args = ["-Xpreprocessor"]
     linker_args = ["-mlinker-version=305", "-Xpreprocessor"]
 else:
