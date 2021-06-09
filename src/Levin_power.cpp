@@ -996,7 +996,7 @@ uint Levin_power::map_chi_index(double chi)
 
 std::tuple<result_Cl_type, result_Cl_type, result_Cl_type> Levin_power::compute_C_ells(bool ell_parallel)
 {
-    int n_tomo_A = number_counts;
+    uint n_tomo_A = number_counts;
     result_Cl_type Cl_AA;
     result_Cl_type Cl_BB;
     result_Cl_type Cl_AB;

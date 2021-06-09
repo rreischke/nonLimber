@@ -1,9 +1,23 @@
+import sys
 from setuptools import setup
 
 # Available at setup time due to pyproject.toml
 from pybind11.setup_helpers import Pybind11Extension
 
+import distutils.sysconfig
+
 __version__ = "0.0.2"
+
+if (sys.platform[:6] == "darwin"
+        and distutils.sysconfig.get_config_var("CC") == "clang"):
+    compiler_args = ["-Xpreprocessor"]
+    linker_args = ["-mlinker-version=305", "-Xpreprocessor"]
+else:
+    compiler_args = []
+    linker_args = []
+
+compiler_args += ["-fopenmp"]
+linker_args += ["-fopenmp"]
 
 ext_modules = [
     Pybind11Extension(
@@ -12,7 +26,8 @@ ext_modules = [
         cxx_std=11,
         include_dirs=["src"],
         libraries=["m", "gsl", "gslcblas"],
-        extra_compile_args=["-Xpreprocessor", "-fopenmp"],
+        extra_compile_args=compiler_args,
+        extra_link_args=linker_args
         ),
 ]
 
