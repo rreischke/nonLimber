@@ -13,7 +13,7 @@ if __name__ == "__main__":
     #print("background", [k for k in background.keys()])
     
     number_count = kernels["kernels_cl"].shape[0]
-    lp = levinpower.LevinPower(False,number_count, 
+    lp = levinpower.LevinPower(number_count, 
                           background["z"], background["chi"], 
                           kernels["chi_cl"], np.concatenate((kernels["kernels_cl"].T, kernels["kernels_sh"].T), axis=1), 
                           pk["k"], pk["z"], pk["pk_lin"].flatten(), pk["pk_nl"].flatten())

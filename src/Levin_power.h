@@ -45,9 +45,9 @@ private:
   static const double min_sv;
   static const uint N_interp = 175;
   const double eLimber_rel = 1e-5;
-  const uint ellmax_non_limber = 95;
+  uint ellmax_non_limber;
   const uint maximum_number_subintervals = 10;
-  const uint ell_limber = 1000;
+  uint ell_limber;
   const uint N_thread_max = std::thread::hardware_concurrency();
 
   std::vector<uint> ell_eLimber;
@@ -119,7 +119,9 @@ public:
  * 
  * Lengths in the code are expressed in \f$\mathrm{Mpc}\f$.
  */
-  Levin_power(bool precompute1, std::vector<uint> ell1, uint number_count, std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl, std::vector<std::vector<double>> kernel, std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl);
+  Levin_power(std::vector<uint> ell1, uint number_count, std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl,
+              std::vector<std::vector<double>> kernel, std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl,
+              bool precompute1, uint ell_max_non_Limber, uint ell_max_ext_Limber);
 
   /**
  * Destructor: clean up all allocated memory.

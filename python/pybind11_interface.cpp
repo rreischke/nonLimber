@@ -16,8 +16,12 @@ PYBIND11_MODULE(levinpower, m)
      m.doc() = "Compute integrals with Levin's method.";
 
      py::class_<Levin_power>(m, "LevinPower")
-         .def(py::init<bool, std::vector<uint>, uint, std::vector<double>, std::vector<double>, std::vector<double>, std::vector<std::vector<double>>, std::vector<double>, std::vector<double>, std::vector<double>, std::vector<double>>(),
-              "precompute1"_a, "ell1"_a, "number_count"_a, "z_bg"_a, "chi_bg"_a, "chi_cl"_a, "kernel"_a, "k_pk"_a, "z_pk"_a, "pk_l"_a, "pk_nl"_a) // Keyword arguments
+         .def(py::init<std::vector<uint>, uint, std::vector<double>, std::vector<double>, std::vector<double>,
+                       std::vector<std::vector<double>>, std::vector<double>, std::vector<double>, std::vector<double>, std::vector<double>,
+                       bool, uint, uint>(),
+              "ell"_a, "number_count"_a, "z_bg"_a, "chi_bg"_a, "chi_cl"_a,
+              "kernel"_a, "k_pk"_a, "z_pk"_a, "pk_l"_a, "pk_nl"_a,
+              "precompute_splines"_a=false, "ell_max_non_Limber"_a=95, "ell_max_ext_Limber"_a=1000) // Keyword arguments
          .def("all_C_ell", &Levin_power::all_C_ell,
               "ell"_a, "linear"_a,                      // Keyword arguments
               py::call_guard<py::gil_scoped_release>(), // Should (?) release GIL

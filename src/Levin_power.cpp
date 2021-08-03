@@ -8,7 +8,11 @@ const double Levin_power::tol_abs = 1.0e-30;
 const double Levin_power::tol_rel = 1.0e-7;
 const double Levin_power::min_sv = 1.0e-10;
 
-Levin_power::Levin_power(bool precompute1, std::vector<uint> ell1, uint number_count, std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl, std::vector<std::vector<double>> kernel, std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl)
+Levin_power::Levin_power(std::vector<uint> ell1, uint number_count,
+                         std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl,
+                         std::vector<std::vector<double>> kernel,
+                         std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl,
+                         bool precompute1, uint ell_max_non_Limber, uint ell_max_ext_Limber)
 {
     if (kernel.size() != chi_cl.size())
     {
@@ -22,6 +26,8 @@ Levin_power::Levin_power(bool precompute1, std::vector<uint> ell1, uint number_c
     precompute = precompute1;
     n_total = kernel.at(0).size();
     number_counts = number_count;
+    ell_limber = ell_max_ext_Limber;
+    ellmax_non_limber = ell_max_non_Limber;
     init_splines(z_bg, chi_bg, chi_cl, kernel, k_pk, z_pk, pk_l, pk_nl);
     set_pointer();
     ell_list = ell1;
