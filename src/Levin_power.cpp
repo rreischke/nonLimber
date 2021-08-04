@@ -812,7 +812,7 @@ double Levin_power::dlnP_dlnk(double k, double z)
 
 double Levin_power::d2P_d2k(double k, double z)
 {
-    return (gsl_spline2d_eval_deriv_xx(spline_P_nl, log(k), z, acc_P_nl_k, acc_P_nl_z) + gsl_pow_2(dlnP_dlnk(k, z)) - dlnP_dlnk(k, z)) * power_nonlinear(z, k) / gsl_pow_2(k);
+    return (gsl_spline2d_eval_deriv_xx(spline_P_nl, log(k), z, acc_P_nl_k, acc_P_nl_z) + gsl_pow_2(dlnP_dlnk(k, z))) * power_nonlinear(z, k) / gsl_pow_2(k);
 }
 
 double Levin_power::d2P_d2k_interp(double k, double z)
@@ -822,7 +822,7 @@ double Levin_power::d2P_d2k_interp(double k, double z)
 
 double Levin_power::d3P_d3k(double k, double z)
 {
-    return gsl_spline2d_eval_deriv_x(spline_d2P_d2k, log(k), z, acc_d2P_d2k_k, acc_d2P_d2k_z) * k;
+    return gsl_spline2d_eval_deriv_x(spline_d2P_d2k, log(k), z, acc_d2P_d2k_k, acc_d2P_d2k_z) / k;
 }
 
 double Levin_power::dlnkernels_dlnchi(double chi, uint i_tomo)
@@ -845,15 +845,16 @@ double Levin_power::extended_Limber_kernel(double chi, void *p)
     chi = exp(chi);
     uint tid = omp_get_thread_num();
     Levin_power *lp = static_cast<Levin_power *>(p);
+    uint ell = lp->integration_variable_extended_Limber_ell[tid];
     double weight_i_tomo = lp->kernels(chi, lp->integration_variable_extended_Limber_i_tomo[tid]);
     double weight_j_tomo = lp->kernels(chi, lp->integration_variable_extended_Limber_j_tomo[tid]);
-    double k = (lp->integration_variable_extended_Limber_ell[tid] + 0.5) / chi;
+    double k = (ell + 0.5) / chi;
     double z = lp->z_of_chi(chi);
     double power = lp->power_nonlinear(z, k);
     double limber_part = weight_i_tomo * weight_j_tomo / chi * power;
-    double dlnf_i = lp->dlnkernels_dlnchi(chi, lp->integration_variable_extended_Limber_i_tomo[tid]) - 0.5 / sqrt(chi);
-    double dlnf_j = lp->dlnkernels_dlnchi(chi, lp->integration_variable_extended_Limber_j_tomo[tid]) - 0.5 / sqrt(chi);
-    double correction = 0.5 / gsl_pow_2(lp->integration_variable_extended_Limber_ell[tid] + 0.5) * (dlnf_i * dlnf_j * lp->extended_limber_s(k, z) - lp->extended_limber_p(k, z));
+    double dlnf_i = lp->dlnkernels_dlnchi(chi, lp->integration_variable_extended_Limber_i_tomo[tid]);
+    double dlnf_j = lp->dlnkernels_dlnchi(chi, lp->integration_variable_extended_Limber_j_tomo[tid]);
+    double correction = 0.5 / gsl_pow_2(ell + 0.5) * (dlnf_i * dlnf_j * lp->extended_limber_s(k, z) - lp->extended_limber_p(k, z));
     return limber_part * (1.0 + correction);
 }
 
