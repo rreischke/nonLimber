@@ -846,14 +846,16 @@ double Levin_power::extended_Limber_kernel(double chi, void *p)
     uint tid = omp_get_thread_num();
     Levin_power *lp = static_cast<Levin_power *>(p);
     uint ell = lp->integration_variable_extended_Limber_ell[tid];
-    double weight_i_tomo = lp->kernels(chi, lp->integration_variable_extended_Limber_i_tomo[tid]);
-    double weight_j_tomo = lp->kernels(chi, lp->integration_variable_extended_Limber_j_tomo[tid]);
+    uint i_tomo = lp->integration_variable_extended_Limber_i_tomo[tid];
+    uint j_tomo = lp->integration_variable_extended_Limber_j_tomo[tid];
+    double weight_i_tomo = lp->kernels(chi, i_tomo);
+    double weight_j_tomo = lp->kernels(chi, j_tomo);
     double k = (ell + 0.5) / chi;
     double z = lp->z_of_chi(chi);
     double power = lp->power_nonlinear(z, k);
     double limber_part = weight_i_tomo * weight_j_tomo / chi * power;
-    double dlnf_i = lp->dlnkernels_dlnchi(chi, lp->integration_variable_extended_Limber_i_tomo[tid]);
-    double dlnf_j = lp->dlnkernels_dlnchi(chi, lp->integration_variable_extended_Limber_j_tomo[tid]);
+    double dlnf_i = lp->dlnkernels_dlnchi(chi, i_tomo) - 0.5;
+    double dlnf_j = lp->dlnkernels_dlnchi(chi, j_tomo) - 0.5;
     double correction = 0.5 / gsl_pow_2(ell + 0.5) * (dlnf_i * dlnf_j * lp->extended_limber_s(k, z) - lp->extended_limber_p(k, z));
     return limber_part * (1.0 + correction);
 }
