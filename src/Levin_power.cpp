@@ -259,26 +259,28 @@ void Levin_power::init_splines(std::vector<double> z_bg, std::vector<double> chi
         k_min = k_pk.at(1);
         k_max = k_pk.at(k_pk.size() - 2);
     }
+    std::vector<double> init_array_1(k_pk.size() * z_pk.size());
+    std::vector<double> init_array_2(k_pk.size() * z_pk.size());
     for (uint i = 0; i < k_pk.size(); i++)
     {
         k_pk.at(i) = log(k_pk.at(i));
         for (uint j = 0; j < z_pk.size(); j++)
         {
-            pk_l.at(i * z_pk.size() + j) = log(pk_l.at(i * z_pk.size() + j));
-            pk_nl.at(i * z_pk.size() + j) = log(pk_nl.at(i * z_pk.size() + j));
+            init_array_1.at(j * k_pk.size() + i) = log(pk_l.at(j * k_pk.size() + i));
+            init_array_2.at(j * k_pk.size() + i) = log(pk_nl.at(j * k_pk.size() + i));
         }
     }
-    gsl_spline2d_init(spline_P_l, &k_pk[0], &z_pk[0], &pk_l[0], k_pk.size(), z_pk.size());
-    gsl_spline2d_init(spline_P_nl, &k_pk[0], &z_pk[0], &pk_nl[0], k_pk.size(), z_pk.size());
-    std::vector<double> init_d2P_d2k(k_pk.size() * z_pk.size());
+    gsl_spline2d_init(spline_P_l, &k_pk[0], &z_pk[0], &init_array_1[0], k_pk.size(), z_pk.size());
+    gsl_spline2d_init(spline_P_nl, &k_pk[0], &z_pk[0], &init_array_2[0], k_pk.size(), z_pk.size());
+    std:fill(init_array_1.begin(), init_array_1.end(), 0.0);
     for (uint i = 0; i < k_pk.size(); i++)
     {
         for (uint j = 0; j < z_pk.size(); j++)
         {
-            init_d2P_d2k.at(j * z_pk.size() + i) = d2P_d2k(exp(k_pk.at(i)), z_pk.at(j));
+            init_array_1.at(j * k_pk.size() + i) = d2P_d2k(exp(k_pk.at(i)), z_pk.at(j));
         }
     }
-    gsl_spline2d_init(spline_d2P_d2k, &k_pk[0], &z_pk[0], &init_d2P_d2k[0], k_pk.size(), z_pk.size());
+    gsl_spline2d_init(spline_d2P_d2k, &k_pk[0], &z_pk[0], &init_array_1[0], k_pk.size(), z_pk.size());
 }
 
 double Levin_power::kernels(double chi, uint i_tomo)
