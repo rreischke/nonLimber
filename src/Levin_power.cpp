@@ -53,6 +53,8 @@ Levin_power::~Levin_power()
     for (uint i = 0; i < n_total; i++)
     {
         gsl_spline_free(spline_Weight.at(i));
+        gsl_spline_free(spline_ext_Limber_f.at(i));
+        gsl_spline_free(spline_ext_Limber_d2f_dchi2.at(i));
         gsl_interp_accel_free(acc_Weight.at(i));
     }
     gsl_spline2d_free(spline_P_l);
@@ -226,6 +228,8 @@ void Levin_power::init_splines(std::vector<double> z_bg, std::vector<double> chi
         if (!bessel_set)
         {
             spline_Weight.push_back(gsl_spline_alloc(gsl_interp_steffen, chi_cl.size()));
+            spline_ext_Limber_f.push_back(gsl_spline_alloc(gsl_interp_steffen, chi_cl.size()));
+            spline_ext_Limber_d2f_dchi2.push_back(gsl_spline_alloc(gsl_interp_steffen, chi_cl.size()));
             acc_Weight.push_back(gsl_interp_accel_alloc());
         }
         std::vector<double> init_weight(chi_cl.size(), 0.0);
@@ -238,6 +242,17 @@ void Levin_power::init_splines(std::vector<double> z_bg, std::vector<double> chi
             kernel_maximum.push_back(chi_cl.at(find_kernel_maximum(init_weight)));
         }
         gsl_spline_init(spline_Weight.at(i_tomo), &chi_cl[0], &init_weight[0], chi_cl.size());
+        for (uint i = 0; i < chi_cl.size(); i++)
+        {
+            init_weight.at(i) = kernel.at(i).at(i_tomo)/sqrt(chi_cl.at(i));
+        }
+        gsl_spline_init(spline_ext_Limber_f.at(i_tomo), &chi_cl[0], &init_weight[0], chi_cl.size());
+        ext_Limber_f_maximum.push_back(chi_cl.at(find_kernel_maximum(init_weight)));
+        for (uint i = 0; i < chi_cl.size(); i++)
+        {
+            init_weight.at(i) = ext_Limber_d2f_dchi2(chi_cl.at(i), i_tomo);
+        }
+        gsl_spline_init(spline_ext_Limber_d2f_dchi2.at(i_tomo), &chi_cl[0], &init_weight[0], chi_cl.size());
     }
     if (!bessel_set)
     {
@@ -840,6 +855,23 @@ double Levin_power::extended_limber_p(double k, double z)
     return gsl_pow_2(k) * ((3.0 * d2P_d2k_interp(k, z) + k * d3P_d3k(k, z)) / (3.0 * power_nonlinear(z, k)));
 }
 
+double Levin_power::ext_Limber_f(double chi, uint i_tomo)
+{
+    return gsl_spline_eval(spline_ext_Limber_f.at(i_tomo), chi, acc_Weight.at(i_tomo));
+}
+double Levin_power::ext_Limber_df_dchi(double chi, uint i_tomo)
+{
+    return gsl_spline_eval_deriv(spline_ext_Limber_f.at(i_tomo), chi, acc_Weight.at(i_tomo));
+}
+double Levin_power::ext_Limber_d2f_dchi2(double chi, uint i_tomo)
+{
+    return gsl_spline_eval_deriv2(spline_ext_Limber_f.at(i_tomo), chi, acc_Weight.at(i_tomo));
+}
+double Levin_power::ext_Limber_d3f_dchi3(double chi, uint i_tomo)
+{
+    return gsl_spline_eval_deriv(spline_ext_Limber_d2f_dchi2.at(i_tomo), chi, acc_Weight.at(i_tomo));
+}
+
 double Levin_power::extended_Limber_kernel(double chi, void *p)
 {
     chi = exp(chi);
@@ -848,16 +880,58 @@ double Levin_power::extended_Limber_kernel(double chi, void *p)
     uint ell = lp->integration_variable_extended_Limber_ell[tid];
     uint i_tomo = lp->integration_variable_extended_Limber_i_tomo[tid];
     uint j_tomo = lp->integration_variable_extended_Limber_j_tomo[tid];
-    double weight_i_tomo = lp->kernels(chi, i_tomo);
-    double weight_j_tomo = lp->kernels(chi, j_tomo);
+    
     double k = (ell + 0.5) / chi;
     double z = lp->z_of_chi(chi);
     double power = lp->power_nonlinear(z, k);
-    double limber_part = weight_i_tomo * weight_j_tomo / chi * power;
-    double dlnf_i = lp->dlnkernels_dlnchi(chi, i_tomo) - 0.5;
-    double dlnf_j = lp->dlnkernels_dlnchi(chi, j_tomo) - 0.5;
-    double correction = 0.5 / gsl_pow_2(ell + 0.5) * (dlnf_i * dlnf_j * lp->extended_limber_s(k, z) - lp->extended_limber_p(k, z));
-    return limber_part * (1.0 + correction);
+
+    if(k < lp->k_min) {
+        // Check if we hit k_min, which would mess with the derivatives.
+        // Doesn't seem to be the case
+        std::cerr << "ell = " << ell << ", k < k_min: " << k << ", " << lp->k_min << std::endl;
+    }
+    // Old setup
+    // double weight_i_tomo = lp->kernels(chi, i_tomo);
+    // double weight_j_tomo = lp->kernels(chi, j_tomo);
+    // double limber_part = weight_i_tomo * weight_j_tomo / chi * power;
+    // double dlnf_i = lp->dlnkernels_dlnchi(chi, i_tomo) - 0.5;
+    // double dlnf_j = lp->dlnkernels_dlnchi(chi, j_tomo) - 0.5;
+    // double correction = 0.5 / gsl_pow_2(ell + 0.5) * (dlnf_i * dlnf_j * lp->extended_limber_s(k, z) - lp->extended_limber_p(k, z));
+    // return limber_part * (1.0 + correction);
+
+    double f_i = lp->ext_Limber_f(chi, i_tomo);
+    double f_j = lp->ext_Limber_f(chi, j_tomo);
+    
+    // double dlnf_i = lp->ext_Limber_df_dchi(chi, i_tomo) * chi/f_i;
+    // double dlnf_j = lp->ext_Limber_df_dchi(chi, j_tomo) * chi/f_j;
+
+    double d2f_i = lp->ext_Limber_d2f_dchi2(chi, i_tomo);
+    double d3f_i = lp->ext_Limber_d3f_dchi3(chi, i_tomo);
+    double d2f_j = lp->ext_Limber_d2f_dchi2(chi, j_tomo);
+    double d3f_j = lp->ext_Limber_d3f_dchi3(chi, j_tomo);
+
+    // Set kernel derivatives to zero outside kernel support.
+    // Doesn't seem to matter
+    if(f_i < 1e-3*lp->ext_Limber_f(lp->ext_Limber_f_maximum.at(i_tomo), i_tomo)) {
+        dlnf_i = 0.0;
+        d2f_i = 0.0;
+        d3f_i = 0.0;
+    }
+    if(f_j < 1e-3*lp->ext_Limber_f(lp->ext_Limber_f_maximum.at(j_tomo), j_tomo)) {
+        dlnf_j = 0.0;
+        d2f_j = 0.0;
+        d3f_j = 0.0;
+    }
+    
+    double limber_part = f_i * f_j * power;
+
+    // double correction = 0.5 / gsl_pow_2(ell + 0.5) * (dlnf_i * dlnf_j * lp->extended_limber_s(k, z) - lp->extended_limber_p(k, z));
+    // return limber_part * (1.0 + correction);
+
+    double d2f_f = d2f_i*f_j + d2f_j*f_i;
+    double d3f_f = d3f_i*f_j + d3f_j*f_i;
+    double ext_Limber_part = power * (-1.0/2) * gsl_pow_2(chi)/ gsl_pow_2(ell + 0.5) * (d2f_f + chi/3.0 * d3f_f);
+    return limber_part + ext_Limber_part;
 }
 
 double Levin_power::extended_Limber(uint ell, uint i_tomo, uint j_tomo)

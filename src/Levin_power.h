@@ -64,6 +64,8 @@ private:
   gsl_interp_accel *acc_d2P_d2k_z;
   std::vector<gsl_interp_accel *> acc_Weight;
   std::vector<gsl_spline *> spline_Weight;
+  std::vector<gsl_spline *> spline_ext_Limber_f;
+  std::vector<gsl_spline *> spline_ext_Limber_d2f_dchi2;
   std::vector<gsl_interp_accel *> acc_result;
   std::vector<gsl_spline *> spline_result;
 
@@ -72,6 +74,7 @@ private:
   gsl_interp_accel *acc_z_of_chi;
   gsl_spline *spline_z_of_chi;
   std::vector<double> kernel_maximum;
+  std::vector<double> ext_Limber_f_maximum;
 
   std::vector<gsl_interp_accel *> acc_aux_kernel;
   std::vector<gsl_spline *> spline_aux_kernel;
@@ -307,6 +310,11 @@ public:
   double extended_limber_s(double k, double z);
 
   double extended_limber_p(double k, double z);
+
+  double ext_Limber_f(double chi, uint i_tomo);
+  double ext_Limber_df_dchi(double chi, uint i_tomo);
+  double ext_Limber_d2f_dchi2(double chi, uint i_tomo);
+  double ext_Limber_d3f_dchi3(double chi, uint i_tomo);
 
   static double extended_Limber_kernel(double, void *);
 
