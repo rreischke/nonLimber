@@ -38,15 +38,15 @@ typedef std::vector<std::vector<double>> result_Cl_type;
 class Levin_power
 {
 private:
-  static const double min_interval;
+  double min_interval;
   static const double tol_abs;
-  static const double tol_rel;
-  static const double limber_tolerance;
+  double tol_rel;
+  double limber_tolerance;
   static const double min_sv;
   static const uint N_interp = 175;
   const double eLimber_rel = 1e-5;
   uint ellmax_non_limber;
-  const uint maximum_number_subintervals = 10;
+  uint maximum_number_subintervals;
   uint ell_limber;
   const uint N_thread_max = std::thread::hardware_concurrency();
 
@@ -121,7 +121,8 @@ public:
  */
   Levin_power(std::vector<uint> ell1, uint number_count, std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl,
               std::vector<std::vector<double>> kernel, std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl,
-              bool precompute1, uint ell_max_non_Limber, uint ell_max_ext_Limber);
+              bool precompute1, uint ell_max_non_Limber, uint ell_max_ext_Limber,
+              double tol_rel=1.0e-7, double limber_tolerance=1.0e-2, double min_interval=1.0e-2, uint maximum_number_subintervals=10);
 
   /**
  * Destructor: clean up all allocated memory.

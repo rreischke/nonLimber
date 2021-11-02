@@ -2,17 +2,15 @@
 #include <fstream>
 #include <algorithm>
 
-const double Levin_power::min_interval = 1.e-2;
-const double Levin_power::limber_tolerance = 1.0e-2;
 const double Levin_power::tol_abs = 1.0e-30;
-const double Levin_power::tol_rel = 1.0e-7;
 const double Levin_power::min_sv = 1.0e-10;
 
 Levin_power::Levin_power(std::vector<uint> ell1, uint number_count,
                          std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl,
                          std::vector<std::vector<double>> kernel,
                          std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl,
-                         bool precompute1, uint ell_max_non_Limber, uint ell_max_ext_Limber)
+                         bool precompute1, uint ell_max_non_Limber, uint ell_max_ext_Limber,
+                         double tol_rel, double limber_tolerance, double min_interval, uint maximum_number_subintervals)
 {
     if (kernel.size() != chi_cl.size())
     {
@@ -28,6 +26,11 @@ Levin_power::Levin_power(std::vector<uint> ell1, uint number_count,
     number_counts = number_count;
     ell_limber = ell_max_ext_Limber;
     ellmax_non_limber = ell_max_non_Limber;
+    this->tol_rel = tol_rel;
+    this->limber_tolerance = limber_tolerance;
+    this->min_interval = min_interval;
+    this->maximum_number_subintervals = maximum_number_subintervals;
+
     init_splines(z_bg, chi_bg, chi_cl, kernel, k_pk, z_pk, pk_l, pk_nl);
     set_pointer();
     ell_list = ell1;
@@ -272,7 +275,7 @@ void Levin_power::init_splines(std::vector<double> z_bg, std::vector<double> chi
     }
     gsl_spline2d_init(spline_P_l, &k_pk[0], &z_pk[0], &init_array_1[0], k_pk.size(), z_pk.size());
     gsl_spline2d_init(spline_P_nl, &k_pk[0], &z_pk[0], &init_array_2[0], k_pk.size(), z_pk.size());
-    std:fill(init_array_1.begin(), init_array_1.end(), 0.0);
+    std::fill(init_array_1.begin(), init_array_1.end(), 0.0);
     for (uint i = 0; i < k_pk.size(); i++)
     {
         for (uint j = 0; j < z_pk.size(); j++)
