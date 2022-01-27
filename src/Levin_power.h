@@ -2,6 +2,7 @@
 #define LEVIN_POWER_H
 
 #include <vector>
+#include <map>
 #include <numeric>
 #include <omp.h>
 #include <string>
@@ -38,17 +39,22 @@ typedef std::vector<std::vector<double>> result_Cl_type;
 class Levin_power
 {
 private:
-  static const double min_interval;
+  double min_interval;
   static const double tol_abs;
-  static const double tol_rel;
-  static const double limber_tolerance;
+  double tol_rel;
+  double limber_tolerance;
   static const double min_sv;
   static const uint N_interp = 175;
   const double eLimber_rel = 1e-5;
-  const uint ellmax_non_limber = 95;
-  const uint maximum_number_subintervals = 10;
-  const uint ell_limber = 1000;
-  const uint N_thread_max = std::thread::hardware_concurrency();
+  uint ellmax_non_limber;
+  uint ellmax_non_limber_gg;
+  uint ellmax_non_limber_gs;
+  uint ellmax_non_limber_ss;
+  uint maximum_number_subintervals;
+  uint n_collocation;
+  uint ell_limber;
+  // const uint N_thread_max = std::thread::hardware_concurrency();
+  const uint N_thread_max = omp_get_max_threads();
 
   std::vector<uint> ell_eLimber;
   std::vector<uint> ell_list, ell_list_index;
@@ -90,6 +96,7 @@ private:
   std::vector<std::vector<double>> k_max_bessel;
   std::vector<std::vector<std::vector<double>>> k_bessel;
   uint d;
+  uint n_col;
   uint n_total;
   uint number_counts;
   uint chi_size;
@@ -105,6 +112,12 @@ private:
 
   bool *integration_variable_Limber_linear;
 
+  std::map<uint, std::vector<gsl_vector*>> F_stacked_map;
+  std::map<uint, std::vector<gsl_vector*>> c_map;
+  std::map<uint, std::vector<gsl_matrix*>> matrix_G_map;
+  std::map<uint, std::vector<gsl_matrix*>> matrix_U_map;
+  std::map<uint, std::vector<gsl_permutation*>> P_map;
+
   double gslIntegrateqag(double (*fc)(double, void *), double a, double b);
   double gslIntegrateqng(double (*fc)(double, void *), double a, double b);
   double gslIntegratecquad(double (*fc)(double, void *), double a, double b);
@@ -119,7 +132,11 @@ public:
  * 
  * Lengths in the code are expressed in \f$\mathrm{Mpc}\f$.
  */
-  Levin_power(bool precompute1, std::vector<uint> ell1, uint number_count, std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl, std::vector<std::vector<double>> kernel, std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl);
+  Levin_power(std::vector<uint> ell1, uint number_count, std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl,
+              std::vector<std::vector<double>> kernel, std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl,
+              bool precompute1, uint ell_max_non_Limber, uint ell_max_ext_Limber,
+              double tol_rel=1.0e-7, double limber_tolerance=1.0e-2, double min_interval=1.0e-2, uint maximum_number_subintervals=10,
+              uint n_collocation=7);
 
   /**
  * Destructor: clean up all allocated memory.

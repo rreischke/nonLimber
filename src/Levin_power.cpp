@@ -2,13 +2,16 @@
 #include <fstream>
 #include <algorithm>
 
-const double Levin_power::min_interval = 1.e-2;
-const double Levin_power::limber_tolerance = 1.0e-2;
 const double Levin_power::tol_abs = 1.0e-30;
-const double Levin_power::tol_rel = 1.0e-7;
 const double Levin_power::min_sv = 1.0e-10;
 
-Levin_power::Levin_power(bool precompute1, std::vector<uint> ell1, uint number_count, std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl, std::vector<std::vector<double>> kernel, std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl)
+Levin_power::Levin_power(std::vector<uint> ell1, uint number_count,
+                         std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl,
+                         std::vector<std::vector<double>> kernel,
+                         std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl,
+                         bool precompute1, uint ell_max_non_Limber, uint ell_max_ext_Limber,
+                         double tol_rel, double limber_tolerance, double min_interval, uint maximum_number_subintervals,
+                         uint n_collocation)
 {
     if (kernel.size() != chi_cl.size())
     {
@@ -19,9 +22,25 @@ Levin_power::Levin_power(bool precompute1, std::vector<uint> ell1, uint number_c
         throw std::range_error("Pk_nl dimension does not match sizes of z_pk and k_pk");
     }
     d = 2;
+    n_col = n_collocation;
+    // std::cout << "Num thread: " << N_thread_max << std::endl;
+    // std::cout << "Num collocation: " << n_col << std::endl;
+
     precompute = precompute1;
     n_total = kernel.at(0).size();
     number_counts = number_count;
+    ell_limber = ell_max_ext_Limber;
+    ellmax_non_limber = ell_max_non_Limber;
+
+    this->ellmax_non_limber_gg = ell_max_non_Limber;
+    this->ellmax_non_limber_gs = ell_max_non_Limber;
+    this->ellmax_non_limber_ss = ell_max_non_Limber;
+
+    this->tol_rel = tol_rel;
+    this->limber_tolerance = limber_tolerance;
+    this->min_interval = min_interval;
+    this->maximum_number_subintervals = maximum_number_subintervals;
+
     init_splines(z_bg, chi_bg, chi_cl, kernel, k_pk, z_pk, pk_l, pk_nl);
     set_pointer();
     ell_list = ell1;
@@ -66,6 +85,20 @@ Levin_power::~Levin_power()
         {
             gsl_spline_free(spline_aux_kernel_parallel.at(i * ell_list.size() + l));
             gsl_interp_accel_free(acc_aux_kernel_parallel.at(i * ell_list.size() + l));
+        }
+    }
+
+    // Loop over n_col keys
+    for (auto const& x : F_stacked_map)
+    {
+        uint key = x.first;
+        for (uint i=0; i < N_thread_max; i++)
+        {
+            gsl_vector_free(F_stacked_map[key].at(i));
+            gsl_vector_free(c_map[key].at(i));
+            gsl_matrix_free(matrix_G_map[key].at(i));
+            gsl_matrix_free(matrix_U_map[key].at(i));
+            gsl_permutation_free(P_map[key].at(i));
         }
     }
 }
@@ -173,7 +206,15 @@ void Levin_power::init_Bessel()
         }
         for (uint i = 0; i < n_total; i++)
         {
-            ell_eLimber.push_back(ellmax_non_limber);
+            if (i < number_counts)
+            {
+                ell_eLimber.push_back(ellmax_non_limber_gg);
+            }
+            else
+            {
+                ell_eLimber.push_back(ellmax_non_limber_ss);
+            }
+            // ell_eLimber.push_back(ellmax_non_limber);
         }
     }
     bessel_set = true;
@@ -191,6 +232,22 @@ void Levin_power::set_pointer()
     integration_variable_extended_Limber_j_tomo = new uint[N_thread_max];
     integration_variable_extended_Limber_ell = new uint[N_thread_max];
     integration_variable_Limber_linear = new bool[N_thread_max];
+
+    std::vector<uint> cols = {n_col, n_col/2};
+    for(auto const &col : cols)
+    {
+        uint n = (col + 1) / 2;
+        n *= 2;
+        std::cout << "n: " << n << std::endl;
+        for (uint i=0; i < N_thread_max; i++)
+        {
+            F_stacked_map[col].push_back(gsl_vector_alloc(d * n));
+            c_map[col].push_back(gsl_vector_alloc(d * n));
+            matrix_G_map[col].push_back(gsl_matrix_alloc(d * n, d * n));
+            matrix_U_map[col].push_back(gsl_matrix_alloc(d * n, d * n));
+            P_map[col].push_back(gsl_permutation_alloc(d * n));
+        }
+    }
 }
 
 uint Levin_power::find_kernel_maximum(std::vector<double> kernel)
@@ -253,26 +310,28 @@ void Levin_power::init_splines(std::vector<double> z_bg, std::vector<double> chi
         k_min = k_pk.at(1);
         k_max = k_pk.at(k_pk.size() - 2);
     }
+    std::vector<double> init_array_1(k_pk.size() * z_pk.size());
+    std::vector<double> init_array_2(k_pk.size() * z_pk.size());
     for (uint i = 0; i < k_pk.size(); i++)
     {
         k_pk.at(i) = log(k_pk.at(i));
         for (uint j = 0; j < z_pk.size(); j++)
         {
-            pk_l.at(i * z_pk.size() + j) = log(pk_l.at(i * z_pk.size() + j));
-            pk_nl.at(i * z_pk.size() + j) = log(pk_nl.at(i * z_pk.size() + j));
+            init_array_1.at(j * k_pk.size() + i) = log(pk_l.at(j * k_pk.size() + i));
+            init_array_2.at(j * k_pk.size() + i) = log(pk_nl.at(j * k_pk.size() + i));
         }
     }
-    gsl_spline2d_init(spline_P_l, &k_pk[0], &z_pk[0], &pk_l[0], k_pk.size(), z_pk.size());
-    gsl_spline2d_init(spline_P_nl, &k_pk[0], &z_pk[0], &pk_nl[0], k_pk.size(), z_pk.size());
-    std::vector<double> init_d2P_d2k(k_pk.size() * z_pk.size());
+    gsl_spline2d_init(spline_P_l, &k_pk[0], &z_pk[0], &init_array_1[0], k_pk.size(), z_pk.size());
+    gsl_spline2d_init(spline_P_nl, &k_pk[0], &z_pk[0], &init_array_2[0], k_pk.size(), z_pk.size());
+    std::fill(init_array_1.begin(), init_array_1.end(), 0.0);
     for (uint i = 0; i < k_pk.size(); i++)
     {
         for (uint j = 0; j < z_pk.size(); j++)
         {
-            init_d2P_d2k.at(j * z_pk.size() + i) = d2P_d2k(exp(k_pk.at(i)), z_pk.at(j));
+            init_array_1.at(j * k_pk.size() + i) = d2P_d2k(exp(k_pk.at(i)), z_pk.at(j));
         }
     }
-    gsl_spline2d_init(spline_d2P_d2k, &k_pk[0], &z_pk[0], &init_d2P_d2k[0], k_pk.size(), z_pk.size());
+    gsl_spline2d_init(spline_d2P_d2k, &k_pk[0], &z_pk[0], &init_array_1[0], k_pk.size(), z_pk.size());
 }
 
 double Levin_power::kernels(double chi, uint i_tomo)
@@ -441,8 +500,11 @@ std::vector<double> Levin_power::solve_LSE(double A, double B, uint col, std::ve
 {
     uint n = (col + 1) / 2;
     n *= 2;
-    gsl_vector *F_stacked = gsl_vector_alloc(d * n);
-    gsl_vector *c = gsl_vector_alloc(d * n);
+    uint tid = omp_get_thread_num();
+    gsl_vector *F_stacked = F_stacked_map[col].at(tid);
+    gsl_vector *c = c_map[col].at(tid);
+    // gsl_vector *F_stacked = gsl_vector_alloc(d * n);
+    // gsl_vector *c = gsl_vector_alloc(d * n);
     for (uint j = 0; j < d * n; j++)
     {
         if (j < n)
@@ -461,30 +523,35 @@ std::vector<double> Levin_power::solve_LSE(double A, double B, uint col, std::ve
             gsl_vector_set(F_stacked, j, 0.0);
         }
     }
-    gsl_matrix *matrix_G = gsl_matrix_alloc(d * n, d * n);
+    gsl_matrix *matrix_G = matrix_G_map[col].at(tid);
+    // gsl_matrix *matrix_G = gsl_matrix_alloc(d * n, d * n);
     gsl_matrix_set_zero(matrix_G);
-    for (uint i = 0; i < d; i++)
+    for (uint j = 0; j < n; j++)
     {
-        for (uint j = 0; j < n; j++)
+        for (uint m = 0; m < n; m++)
         {
-            for (uint q = 0; q < d; q++)
+            double bf = basis_function(A, B, x_j[j], m);
+            double bf_p = basis_function_prime(A, B, x_j[j], m);
+            for (uint i = 0; i < d; i++)
             {
-                for (uint m = 0; m < n; m++)
+                for (uint q = 0; q < d; q++)
                 {
-                    double LSE_coeff = A_matrix(q, i, x_j[j], k, ell) * basis_function(A, B, x_j[j], m);
+                    double LSE_coeff = A_matrix(q, i, x_j[j], k, ell) * bf;
                     if (q == i)
                     {
-                        LSE_coeff += basis_function_prime(A, B, x_j[j], m);
+                        LSE_coeff += bf_p;
                     }
                     gsl_matrix_set(matrix_G, i * n + j, q * n + m, LSE_coeff);
                 }
             }
         }
     }
-    gsl_matrix *U = gsl_matrix_alloc(d * n, d * n);
+    gsl_matrix *U = matrix_U_map[col].at(tid);
+    // gsl_matrix *U = gsl_matrix_alloc(d * n, d * n);
     gsl_matrix_memcpy(U, matrix_G);
     int s;
-    gsl_permutation *P = gsl_permutation_alloc(d * n);
+    gsl_permutation *P = P_map[col].at(tid);
+    // gsl_permutation *P = gsl_permutation_alloc(d * n);
     gsl_linalg_LU_decomp(matrix_G, P, &s);
     gsl_error_handler_t *old_handler = gsl_set_error_handler_off();
     int lu = gsl_linalg_LU_solve(matrix_G, P, F_stacked, c);
@@ -510,12 +577,12 @@ std::vector<double> Levin_power::solve_LSE(double A, double B, uint col, std::ve
     {
         result[j] = gsl_vector_get(c, j);
     }
-    gsl_matrix_free(U);
-    gsl_vector_free(F_stacked);
-    gsl_vector_free(c);
-    gsl_permutation_free(P);
+    // gsl_matrix_free(U);
+    // gsl_vector_free(F_stacked);
+    // gsl_vector_free(c);
+    // gsl_permutation_free(P);
+    // gsl_matrix_free(matrix_G);
     gsl_set_error_handler(old_handler);
-    gsl_matrix_free(matrix_G);
     return result;
 }
 
@@ -536,13 +603,13 @@ double Levin_power::integrate(uint iA, uint iB, uint col, uint i_tomo, uint i_k,
     double result = 0.0;
     uint n = (col + 1) / 2;
     n *= 2;
-    std::vector<double> x_j(n);
-    std::vector<double> c(n);
+    // std::vector<double> x_j(n);
+    // std::vector<double> c(n);
     double A = chi_nodes.at(iA);
     double B = chi_nodes.at(iB);
     double k = exp(k_bessel.at(i_tomo).at(ell).at(i_k));
-    x_j = setNodes(A, B, col);
-    c = solve_LSE(A, B, col, x_j, i_tomo, k, ell, linear);
+    std::vector<double> x_j = setNodes(A, B, col);
+    std::vector<double> c = solve_LSE(A, B, col, x_j, i_tomo, k, ell, linear);
     for (uint i = 0; i < d; i++)
     {
         if (precompute)
@@ -658,7 +725,7 @@ std::vector<double> Levin_power::linear_spaced(double min, double max, uint N)
 
 double Levin_power::levin_integrate_bessel(uint i_k, uint ell, uint i_tomo, bool linear)
 {
-    uint n_col = 7;
+    // uint n_col = 7;
     uint n_sub = maximum_number_subintervals;
     //gsl_set_error_handler_off();
     return iterate(chi_min, chi_max, n_col, i_tomo, i_k, ell, n_sub, false, linear);
@@ -806,7 +873,7 @@ double Levin_power::dlnP_dlnk(double k, double z)
 
 double Levin_power::d2P_d2k(double k, double z)
 {
-    return (gsl_spline2d_eval_deriv_xx(spline_P_nl, log(k), z, acc_P_nl_k, acc_P_nl_z) + gsl_pow_2(dlnP_dlnk(k, z)) - dlnP_dlnk(k, z)) * power_nonlinear(z, k) / gsl_pow_2(k);
+    return (gsl_spline2d_eval_deriv_xx(spline_P_nl, log(k), z, acc_P_nl_k, acc_P_nl_z) + gsl_pow_2(dlnP_dlnk(k, z))) * power_nonlinear(z, k) / gsl_pow_2(k);
 }
 
 double Levin_power::d2P_d2k_interp(double k, double z)
@@ -816,7 +883,7 @@ double Levin_power::d2P_d2k_interp(double k, double z)
 
 double Levin_power::d3P_d3k(double k, double z)
 {
-    return gsl_spline2d_eval_deriv_x(spline_d2P_d2k, log(k), z, acc_d2P_d2k_k, acc_d2P_d2k_z) * k;
+    return gsl_spline2d_eval_deriv_x(spline_d2P_d2k, log(k), z, acc_d2P_d2k_k, acc_d2P_d2k_z) / k;
 }
 
 double Levin_power::dlnkernels_dlnchi(double chi, uint i_tomo)
@@ -839,15 +906,18 @@ double Levin_power::extended_Limber_kernel(double chi, void *p)
     chi = exp(chi);
     uint tid = omp_get_thread_num();
     Levin_power *lp = static_cast<Levin_power *>(p);
-    double weight_i_tomo = lp->kernels(chi, lp->integration_variable_extended_Limber_i_tomo[tid]);
-    double weight_j_tomo = lp->kernels(chi, lp->integration_variable_extended_Limber_j_tomo[tid]);
-    double k = (lp->integration_variable_extended_Limber_ell[tid] + 0.5) / chi;
+    uint ell = lp->integration_variable_extended_Limber_ell[tid];
+    uint i_tomo = lp->integration_variable_extended_Limber_i_tomo[tid];
+    uint j_tomo = lp->integration_variable_extended_Limber_j_tomo[tid];
+    double weight_i_tomo = lp->kernels(chi, i_tomo);
+    double weight_j_tomo = lp->kernels(chi, j_tomo);
+    double k = (ell + 0.5) / chi;
     double z = lp->z_of_chi(chi);
     double power = lp->power_nonlinear(z, k);
     double limber_part = weight_i_tomo * weight_j_tomo / chi * power;
-    double dlnf_i = lp->dlnkernels_dlnchi(chi, lp->integration_variable_extended_Limber_i_tomo[tid]) - 0.5 / sqrt(chi);
-    double dlnf_j = lp->dlnkernels_dlnchi(chi, lp->integration_variable_extended_Limber_j_tomo[tid]) - 0.5 / sqrt(chi);
-    double correction = 0.5 / gsl_pow_2(lp->integration_variable_extended_Limber_ell[tid] + 0.5) * (dlnf_i * dlnf_j * lp->extended_limber_s(k, z) - lp->extended_limber_p(k, z));
+    double dlnf_i = lp->dlnkernels_dlnchi(chi, i_tomo) - 0.5;
+    double dlnf_j = lp->dlnkernels_dlnchi(chi, j_tomo) - 0.5;
+    double correction = 0.5 / gsl_pow_2(ell + 0.5) * (dlnf_i * dlnf_j * lp->extended_limber_s(k, z) - lp->extended_limber_p(k, z));
     return limber_part * (1.0 + correction);
 }
 
@@ -1048,9 +1118,9 @@ double Levin_power::gslIntegrateqag(double (*fc)(double, void *), double a, doub
     gf.function = fc;
     gf.params = this;
     double e, y;
-    const uint n = 128;
-    gsl_integration_workspace *w = gsl_integration_workspace_alloc(n);
-    gsl_integration_qag(&gf, a, b, tiny, tol, n, 1, w, &y, &e);
+    const uint n_ws = 128;
+    gsl_integration_workspace *w = gsl_integration_workspace_alloc(n_ws);
+    gsl_integration_qag(&gf, a, b, tiny, tol, n_ws, 1, w, &y, &e);
     gsl_integration_workspace_free(w);
     return y;
 }
@@ -1064,8 +1134,8 @@ double Levin_power::gslIntegrateqng(double (*fc)(double, void *), double a, doub
     gf.function = fc;
     gf.params = this;
     double e, y;
-    size_t n;
-    gsl_integration_qng(&gf, a, b, tiny, tol, &y, &e, &n);
+    size_t n_intg;
+    gsl_integration_qng(&gf, a, b, tiny, tol, &y, &e, &n_intg);
     return y;
 }
 
@@ -1077,8 +1147,8 @@ double Levin_power::gslIntegratecquad(double (*fc)(double, void *), double a, do
     gf.function = fc;
     gf.params = this;
     double e, y;
-    const uint n = 64;
-    gsl_integration_cquad_workspace *w = gsl_integration_cquad_workspace_alloc(n);
+    const uint n_ws = 64;
+    gsl_integration_cquad_workspace *w = gsl_integration_cquad_workspace_alloc(n_ws);
     gsl_integration_cquad(&gf, a, b, tiny, tol, w, &y, &e, NULL);
     gsl_integration_cquad_workspace_free(w);
     return y;
