@@ -9,7 +9,7 @@ Levin_power::Levin_power(std::vector<uint> ell1, uint number_count,
                          std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl,
                          std::vector<std::vector<double>> kernel,
                          std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl,
-                         bool precompute1, uint ell_max_non_Limber, uint ell_max_ext_Limber,
+                         bool precompute1, uint ell_max_non_Limber, uint ell_max_ext_Limber, bool boxy1,
                          double tol_rel, double limber_tolerance, double min_interval, uint maximum_number_subintervals,
                          uint n_collocation)
 {
@@ -31,6 +31,7 @@ Levin_power::Levin_power(std::vector<uint> ell1, uint number_count,
     number_counts = number_count;
     ell_limber = ell_max_ext_Limber;
     ellmax_non_limber = ell_max_non_Limber;
+    boxy = boxy1;
 
     this->ellmax_non_limber_gg = ell_max_non_Limber;
     this->ellmax_non_limber_gs = ell_max_non_Limber;
@@ -89,10 +90,10 @@ Levin_power::~Levin_power()
     }
 
     // Loop over n_col keys
-    for (auto const& x : F_stacked_map)
+    for (auto const &x : F_stacked_map)
     {
         uint key = x.first;
-        for (uint i=0; i < N_thread_max; i++)
+        for (uint i = 0; i < N_thread_max; i++)
         {
             gsl_vector_free(F_stacked_map[key].at(i));
             gsl_vector_free(c_map[key].at(i));
@@ -233,13 +234,12 @@ void Levin_power::set_pointer()
     integration_variable_extended_Limber_ell = new uint[N_thread_max];
     integration_variable_Limber_linear = new bool[N_thread_max];
 
-    std::vector<uint> cols = {n_col, n_col/2};
-    for(auto const &col : cols)
+    std::vector<uint> cols = {n_col, n_col / 2};
+    for (auto const &col : cols)
     {
         uint n = (col + 1) / 2;
         n *= 2;
-        std::cout << "n: " << n << std::endl;
-        for (uint i=0; i < N_thread_max; i++)
+        for (uint i = 0; i < N_thread_max; i++)
         {
             F_stacked_map[col].push_back(gsl_vector_alloc(d * n));
             c_map[col].push_back(gsl_vector_alloc(d * n));
@@ -280,9 +280,54 @@ void Levin_power::init_splines(std::vector<double> z_bg, std::vector<double> chi
             acc_Weight.push_back(gsl_interp_accel_alloc());
         }
         std::vector<double> init_weight(chi_cl.size(), 0.0);
+        if (boxy && i_tomo < number_counts)
+        {
+            s_srd.push_back(0.0);
+            chi0_srd.push_back(0.0);
+            norm_srd.push_back(1.0);
+        }
+        double xmin = 0.0;
+        double xmax = 0.0;
+        double width = 0.0;
         for (uint i = 0; i < chi_cl.size(); i++)
         {
             init_weight.at(i) = kernel.at(i).at(i_tomo);
+            if (boxy && i_tomo < number_counts && i == 0)
+            {
+                bool isweight = false;
+                for (uint j = 0; j < chi_cl.size(); i++)
+                {
+                    if (kernel.at(j).at(i_tomo) > 0.0 && isweight == false)
+                    {
+                        xmin = chi_cl.at(j);
+                        isweight = true;
+                    }
+                    if (kernel.at(j).at(i_tomo) == 0.0 && isweight == true)
+                    {
+                        xmax = chi_cl.at(j);
+                        break;
+                    }
+                }
+            }
+            if (boxy && i_tomo < number_counts)
+            {
+                width = xmax - xmin;
+                s_srd.at(i_tomo) = width;
+                chi0_srd.at(i_tomo) = xmin + width / 2.0;
+                init_weight.at(i) = super_gaussian(chi_cl.at(i), chi0_srd.at(i_tomo), s_srd.at(i_tomo), i_tomo);
+            }
+        }
+        if (boxy)
+        {
+            for (uint i_tomo = 0; i_tomo < number_counts; i_tomo++)
+            {
+                double riemann_sum = 0.0;
+                for (uint i = 0; i < chi_cl.size() - 1; i++)
+                {
+                    riemann_sum += super_gaussian(chi_cl.at(i), chi0_srd.at(i_tomo), s_srd.at(i_tomo), i_tomo) * (chi_cl.at(i + 1) - chi_cl.at(i));
+                }
+                norm_srd.at(i_tomo) = 1.0 / riemann_sum;
+            }
         }
         if (!bessel_set)
         {
@@ -334,9 +379,21 @@ void Levin_power::init_splines(std::vector<double> z_bg, std::vector<double> chi
     gsl_spline2d_init(spline_d2P_d2k, &k_pk[0], &z_pk[0], &init_array_1[0], k_pk.size(), z_pk.size());
 }
 
+double Levin_power::super_gaussian(double x, double x0, double s, uint i_tomo)
+{
+    return norm_srd.at(i_tomo) * exp(-pow((x - x0) / (2.0 * s), n_super));
+}
+
 double Levin_power::kernels(double chi, uint i_tomo)
 {
-    return gsl_spline_eval(spline_Weight.at(i_tomo), chi, acc_Weight.at(i_tomo));
+    if (boxy && i_tomo < number_counts)
+    {
+        return super_gaussian(chi, chi0_srd.at(i_tomo), s_srd.at(i_tomo), i_tomo);
+    }
+    else
+    {
+        return gsl_spline_eval(spline_Weight.at(i_tomo), chi, acc_Weight.at(i_tomo));
+    }
 }
 
 double Levin_power::chi_of_z(double z)
@@ -727,7 +784,7 @@ double Levin_power::levin_integrate_bessel(uint i_k, uint ell, uint i_tomo, bool
 {
     // uint n_col = 7;
     uint n_sub = maximum_number_subintervals;
-    //gsl_set_error_handler_off();
+    // gsl_set_error_handler_off();
     return iterate(chi_min, chi_max, n_col, i_tomo, i_k, ell, n_sub, false, linear);
 }
 
@@ -888,7 +945,14 @@ double Levin_power::d3P_d3k(double k, double z)
 
 double Levin_power::dlnkernels_dlnchi(double chi, uint i_tomo)
 {
-    return gsl_spline_eval_deriv(spline_Weight.at(i_tomo), chi, acc_Weight.at(i_tomo)) / kernels(chi, i_tomo) * chi;
+    if (boxy && i_tomo < number_counts)
+    {
+        return pow(2, -n_super) * n_super * pow((-chi0_srd.at(i_tomo) + chi) / s_srd.at(i_tomo), n_super) / (-chi0_srd.at(i_tomo) - chi) * chi;
+    }
+    else
+    {
+        return gsl_spline_eval_deriv(spline_Weight.at(i_tomo), chi, acc_Weight.at(i_tomo)) / kernels(chi, i_tomo) * chi;
+    }
 }
 
 double Levin_power::extended_limber_s(double k, double z)

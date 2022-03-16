@@ -51,7 +51,6 @@ private:
   uint ellmax_non_limber_gs;
   uint ellmax_non_limber_ss;
   uint maximum_number_subintervals;
-  uint n_collocation;
   uint ell_limber;
   // const uint N_thread_max = std::thread::hardware_concurrency();
   const uint N_thread_max = omp_get_max_threads();
@@ -104,6 +103,9 @@ private:
   double k_min, k_max;
   bool bessel_set = false;
   bool precompute;
+  bool boxy = false;
+  uint n_super = 30;
+  std::vector<double> chi0_srd, s_srd, norm_srd;
 
   uint *integration_variable_i_tomo, *integration_variable_j_tomo, *integration_variable_ell;
 
@@ -134,7 +136,7 @@ public:
  */
   Levin_power(std::vector<uint> ell1, uint number_count, std::vector<double> z_bg, std::vector<double> chi_bg, std::vector<double> chi_cl,
               std::vector<std::vector<double>> kernel, std::vector<double> k_pk, std::vector<double> z_pk, std::vector<double> pk_l, std::vector<double> pk_nl,
-              bool precompute1, uint ell_max_non_Limber, uint ell_max_ext_Limber,
+              bool precompute1, uint ell_max_non_Limber, uint ell_max_ext_Limber, bool boxy1,
               double tol_rel=1.0e-7, double limber_tolerance=1.0e-2, double min_interval=1.0e-2, uint maximum_number_subintervals=10,
               uint n_collocation=7);
 
@@ -170,6 +172,8 @@ public:
  *  Interpolation function for the redshift as a function of comoving distance.
  */
   double z_of_chi(double chi);
+
+  double super_gaussian(double x, double x0, double s, uint i_tomo);
 
   /**
  *  Interpolation function for the linear power spectrum as a function of redshift and wavenumber.
